@@ -28,21 +28,21 @@ CH_GIVEAWAY = 1302595319208607844
 # optional banner shown at the bottom of the welcome embed; drop a PNG here
 BANNER_PATH = Path(__file__).parent.parent / "data" / "assets" / "welcome_banner.png"
 
-WELCOME_LINES = [
-    "Another hunter joins the ranks. Teamers, beware. 🎯",
-    "The Department grows stronger.",
-    "Reinforcements have arrived. 🫡",
-    "A new challenger appears!",
-    "Fresh recruit on deck. Show them the ropes.",
-    "The pest control roster just got bigger.",
+# low-key openers, rotated so back-to-back joins don't look copy-pasted
+WELCOME_OPENERS = [
+    "Good to have you here.",
+    "Glad you made it.",
+    "Make yourself at home.",
+    "Welcome aboard.",
 ]
 
-GOODBYE_LINES = [
-    "o7 Safe travels.",
-    "The Department salutes your service.",
-    "Gone, but the ban hammer remembers.",
-    "One less hunter on the field.",
-]
+
+def _ordinal(n: int) -> str:
+    if 10 <= n % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
 
 
 def _fmt_duration(joined_at: datetime | None) -> str | None:
@@ -70,23 +70,19 @@ class Greetings(commands.Cog):
             return
 
         embed = discord.Embed(
-            title=f"Welcome to TPCD, {member.display_name}! 🎉",
             description=(
-                f"*{random.choice(WELCOME_LINES)}*\n\n"
-                f"**Get started:**\n"
-                f"📜 Read the <#{CH_RULES}>\n"
-                f"🎭 Grab your roles in <#{CH_SELF_ROLES}> (📊 Poll Ping!)\n"
-                f"🎟️ Join one of our clubs → <#{CH_APPLY}>\n"
-                f"📊 Vote in today's <#{CH_DAILY_POLLS}>\n"
-                f"🎁 Giveaways and events → <#{CH_GIVEAWAY}>"
+                f"{random.choice(WELCOME_OPENERS)} A few things to get you started:\n\n"
+                f"📜 Rules live in <#{CH_RULES}>, give them a quick read\n"
+                f"🎭 Pick up your roles in <#{CH_SELF_ROLES}>, Poll Ping gets you the daily poll\n"
+                f"🎟️ Want to join one of our clubs? Head to <#{CH_APPLY}>\n"
+                f"🎁 Giveaways and events run in <#{CH_GIVEAWAY}>\n\n"
+                f"Enjoy your stay!"
             ),
             color=discord.Color.gold(),
             timestamp=datetime.now(timezone.utc),
         )
         embed.set_thumbnail(url=member.display_avatar.url)
-        embed.set_footer(
-            text=f"Member #{member.guild.member_count} · Teamer Pest Control Department"
-        )
+        embed.set_footer(text=f"You are our {_ordinal(member.guild.member_count)} member")
 
         kwargs: dict = {"embed": embed}
         if BANNER_PATH.exists():
@@ -94,7 +90,7 @@ class Greetings(commands.Cog):
             embed.set_image(url="attachment://welcome_banner.png")
         try:
             await channel.send(
-                content=f"🎉 {member.mention} just landed!",
+                content=f"Hey {member.mention}, welcome to TPCD 🎉",
                 allowed_mentions=discord.AllowedMentions(users=True),
                 **kwargs,
             )
@@ -109,16 +105,16 @@ class Greetings(commands.Cog):
         if channel is None:
             return
 
-        lines = [f"**{member.display_name}** left the server. {random.choice(GOODBYE_LINES)}"]
+        lines = [f"**{member.display_name}** has left the server. o7"]
         stayed = _fmt_duration(member.joined_at)
         if stayed:
-            lines.append(f"Was with us for **{stayed}**.")
+            lines.append(f"Member for {stayed}.")
         embed = discord.Embed(
             description="\n".join(lines),
             color=discord.Color.dark_grey(),
             timestamp=datetime.now(timezone.utc),
         )
-        embed.set_footer(text=f"User ID {member.id} · {member.guild.member_count} members remain")
+        embed.set_footer(text=f"ID {member.id} · {member.guild.member_count} members")
         try:
             await channel.send(embed=embed)
         except discord.HTTPException:
