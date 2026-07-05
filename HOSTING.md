@@ -16,7 +16,15 @@ ssh -i path\to\key ubuntu@SERVER_IP "sudo systemctl restart tpcd-bot"           
 scp -i path\to\key ubuntu@SERVER_IP:/opt/tpcd-bot/data/tpcd.db .\tpcd-backup.db     # backup DB
 ```
 
-To redeploy after code changes: tar the project (exclude `.venv`, `__pycache__`, `data`), scp to `/tmp`, extract over `/opt/tpcd-bot`, `chown -R tpcdbot:tpcdbot`, restart the service. **Don't run the bot locally anymore** — the server copy owns the database now; a local copy would double-post and double-reply.
+To redeploy after code changes (commit first — deploys ship exactly what git tracks):
+
+```powershell
+git archive --format=tar.gz -o "$env:TEMP\tpcd-update.tar.gz" HEAD
+scp -i path\to\key "$env:TEMP\tpcd-update.tar.gz" ubuntu@SERVER_IP:/tmp/
+ssh -i path\to\key ubuntu@SERVER_IP "sudo tar -xzf /tmp/tpcd-update.tar.gz -C /opt/tpcd-bot && sudo chown -R tpcdbot:tpcdbot /opt/tpcd-bot && sudo systemctl restart tpcd-bot"
+```
+
+(Plain `tar --exclude` is NOT safe here: bsdtar's exclude patterns match any path component, so `--exclude=data` silently drops `bot/data/` too. git archive sidesteps that.) **Don't run the bot locally anymore** — the server copy owns the database now; a local copy would double-post and double-reply.
 
 ---
 
