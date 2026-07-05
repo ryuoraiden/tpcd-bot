@@ -105,7 +105,7 @@ class Greetings(commands.Cog):
         if channel is None:
             return
 
-        lines = [f"**{member.display_name}** has left the server. o7"]
+        lines = [f"**{member.display_name}** has left the server."]
         stayed = _fmt_duration(member.joined_at)
         if stayed:
             lines.append(f"Member for {stayed}.")

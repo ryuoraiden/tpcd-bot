@@ -20,7 +20,13 @@ log = logging.getLogger("tpcd")
 
 BANK_PATH = Path(__file__).parent / "data" / "question_bank.json"
 
-COGS = ["bot.cogs.daily_polls", "bot.cogs.poll_admin", "bot.cogs.tournaments", "bot.cogs.greetings"]
+COGS = [
+    "bot.cogs.daily_polls",
+    "bot.cogs.poll_admin",
+    "bot.cogs.tournaments",
+    "bot.cogs.greetings",
+    "bot.cogs.self_roles",
+]
 
 
 class TPCDBot(commands.Bot):
