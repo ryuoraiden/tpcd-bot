@@ -4,7 +4,7 @@
 
 Running on the Oracle Cloud Always Free instance shared with NITC Bot:
 
-- Instance: `OCI_INSTANCE`, Ubuntu 24.04, VM.Standard.E2.1.Micro, IP `SERVER_IP`, user `ubuntu`
+- Instance: Ubuntu 24.04, VM.Standard.E2.1.Micro (concrete IP/instance/key in the untracked `OPS.md`)
 - Bot lives in `/opt/tpcd-bot` (venv, `.env`, SQLite at `data/tpcd.db`), runs as system user `tpcdbot`
 - Service: `tpcd-bot.service` — enabled (starts on boot), `Restart=on-failure`
 

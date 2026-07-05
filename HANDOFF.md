@@ -6,7 +6,7 @@
 
 Custom Discord bot for the TPCD (Teamer Pest Control Department) server, a ~500 member multi-club Brawl Stars anti-teaming community owned by Mohammed Hani (B25 CSE, NITC). First shipped feature: fully automated daily polls for the #daily-polls channel, built because engagement there was dying (4-27 votes per poll, 50% tie rate, one member complaining they carried the channel alone).
 
-- Code: `D:\Projects\TPCD Discord Bot` (Windows dev machine). Repo: **https://github.com/ryuoraiden/tpcd-bot** (private — HANDOFF/HOSTING contain server IP and infra details; scrub those before ever making it public)
+- Code: `D:\Projects\TPCD Discord Bot` (Windows dev machine). Repo: **https://github.com/ryuoraiden/tpcd-bot** (public; infra specifics like the server IP live only in the untracked `OPS.md`, keep them out of tracked files)
 - Bot account: **TPCD Bot#6680**, application id `1522683008652411041`
 - Server: TPCD, guild id `1265581954049380394`; poll channel id `1399995153850306640`
 - Production: Oracle Cloud Always Free VM shared with the owner's NITC Bot (separate project, `D:/Projects/NITC Discord Bot`, repo ryuoraiden/nitc-bot)
@@ -96,7 +96,7 @@ Discord limits enforced by seed_check: question ≤300 chars, options 2-10, each
 
 ## Production deployment
 
-- Instance: `OCI_INSTANCE`, Ubuntu 24.04, VM.Standard.E2.1.Micro (1 GB RAM), IP `SERVER_IP`, SSH user `ubuntu`, key was at `PATH_TO_SSH_KEY`
+- Instance: Ubuntu 24.04, VM.Standard.E2.1.Micro (1 GB RAM). Concrete IP, instance name, and SSH key location live in the **untracked `OPS.md`** in the project root on the dev machine
 - Bot at `/opt/tpcd-bot`, own venv, runs as no-login system user `tpcdbot`, `.env` chmod 600
 - systemd: `tpcd-bot.service`, enabled on boot, Restart=on-failure
 - 2G swapfile present; NITC bot shares the box (service `nitc-bot` planned/deployed separately)
