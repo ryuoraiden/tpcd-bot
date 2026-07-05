@@ -1,0 +1,61 @@
+"""TPCD Bot entry point: python -m bot"""
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+from pathlib import Path
+
+import discord
+from discord.ext import commands
+
+from .config import config
+from .db import Database
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+)
+log = logging.getLogger("tpcd")
+
+BANK_PATH = Path(__file__).parent / "data" / "question_bank.json"
+
+COGS = ["bot.cogs.daily_polls", "bot.cogs.poll_admin", "bot.cogs.tournaments"]
+
+
+class TPCDBot(commands.Bot):
+    def __init__(self) -> None:
+        intents = discord.Intents.default()
+        super().__init__(command_prefix="!tpcd ", intents=intents)
+        self.db = Database(config.db_path)
+
+    async def setup_hook(self) -> None:
+        await self.db.connect()
+        bank = json.loads(BANK_PATH.read_text(encoding="utf-8"))
+        inserted = await self.db.seed(bank)
+        if inserted:
+            log.info("Seeded %d new questions into the bank.", inserted)
+        for cog in COGS:
+            await self.load_extension(cog)
+        synced = await self.tree.sync()
+        log.info("Synced %d slash commands.", len(synced))
+
+    async def on_ready(self) -> None:
+        log.info("Logged in as %s (id %s)", self.user, self.user.id)
+
+    async def close(self) -> None:
+        await self.db.close()
+        await super().close()
+
+
+def main() -> None:
+    config.validate()
+    bot = TPCDBot()
+    try:
+        bot.run(config.token, log_handler=None)
+    except KeyboardInterrupt:
+        pass
+
+
+if __name__ == "__main__":
+    main()
