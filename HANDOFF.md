@@ -6,7 +6,7 @@
 
 Custom Discord bot for the TPCD (Teamer Pest Control Department) server, a ~500 member multi-club Brawl Stars anti-teaming community owned by Mohammed Hani (B25 CSE, NITC). First shipped feature: fully automated daily polls for the #daily-polls channel, built because engagement there was dying (4-27 votes per poll, 50% tie rate, one member complaining they carried the channel alone).
 
-- Code: `D:\Projects\TPCD Discord Bot` (Windows dev machine). **No git repo yet.**
+- Code: `D:\Projects\TPCD Discord Bot` (Windows dev machine). Repo: **https://github.com/ryuoraiden/tpcd-bot** (private — HANDOFF/HOSTING contain server IP and infra details; scrub those before ever making it public)
 - Bot account: **TPCD Bot#6680**, application id `1522683008652411041`
 - Server: TPCD, guild id `1265581954049380394`; poll channel id `1399995153850306640`
 - Production: Oracle Cloud Always Free VM shared with the owner's NITC Bot (separate project, `D:/Projects/NITC Discord Bot`, repo ryuoraiden/nitc-bot)
@@ -116,9 +116,9 @@ Discord limits enforced by seed_check: question ≤300 chars, options 2-10, each
 ## Pending / backlog
 
 - [ ] Fill `ADMIN_ROLE_IDS` on the server and restart (gotcha 5)
-- [ ] Clean the real token out of `.env.example`; reset the NITC token that leaked into it
-- [ ] `git init` + private GitHub repo (after the cleanup above)
-- [ ] Verify the first scheduled 9 AM IST poll fires (deployed 2026-07-04; check journalctl next morning)
+- [x] ~~Clean the real token out of .env.example~~ (done 2026-07-05, placeholders restored) — still worth resetting the NITC token that sat in it
+- [x] ~~git init + private GitHub repo~~ (done 2026-07-05: ryuoraiden/tpcd-bot, private. Commit per change from now on so upgrades have history)
+- [x] ~~Verify the first scheduled 9 AM IST poll fires~~ (confirmed 2026-07-05: fired on schedule, finalize job queued)
 - [ ] Verify NITC Bot's slash commands recovered after its next start (gotcha 1)
 - [ ] Occasional `scp` backup of `/opt/tpcd-bot/data/tpcd.db`
 - [ ] Bank runs dry around year-end at 1/day (200 questions, ~187 days from launch); low-pool DM gives warning at 14 left
