@@ -30,6 +30,8 @@ class Config:
     token: str = os.getenv("DISCORD_TOKEN", "")
     poll_channel_id: int = _int_env("POLL_CHANNEL_ID")
     poll_ping_role_id: int = _int_env("POLL_PING_ROLE_ID")
+    welcome_channel_id: int = _int_env("WELCOME_CHANNEL_ID")
+    goodbye_channel_id: int = _int_env("GOODBYE_CHANNEL_ID")
     owner_id: int = _int_env("OWNER_ID")
     admin_role_ids: list[int] = field(default_factory=lambda: _id_list("ADMIN_ROLE_IDS"))
     post_time: str = os.getenv("POST_TIME", "09:00")

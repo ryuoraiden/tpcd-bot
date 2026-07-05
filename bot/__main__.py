@@ -20,12 +20,16 @@ log = logging.getLogger("tpcd")
 
 BANK_PATH = Path(__file__).parent / "data" / "question_bank.json"
 
-COGS = ["bot.cogs.daily_polls", "bot.cogs.poll_admin", "bot.cogs.tournaments"]
+COGS = ["bot.cogs.daily_polls", "bot.cogs.poll_admin", "bot.cogs.tournaments", "bot.cogs.greetings"]
 
 
 class TPCDBot(commands.Bot):
     def __init__(self) -> None:
         intents = discord.Intents.default()
+        # privileged intent, needed only for welcome/goodbye; must also be
+        # enabled in the dev portal (Bot -> Server Members Intent)
+        if config.welcome_channel_id or config.goodbye_channel_id:
+            intents.members = True
         super().__init__(command_prefix="!tpcd ", intents=intents)
         self.db = Database(config.db_path)
 
