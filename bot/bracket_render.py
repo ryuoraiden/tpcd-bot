@@ -24,7 +24,6 @@ BLURPLE = (139, 148, 255)
 BOX_W, BOX_H = 276, 66
 GAP_X, GAP_Y = 78, 26
 MARGIN = 44
-HEADER = 112
 MAX_BRACKET_SIZE = 32  # above this, callers should fall back to text
 
 # Codepoint ranges the bundled fonts can't draw (CJK, emoji, symbols) —
@@ -102,8 +101,17 @@ def render_bracket(
     title = sanitize_name(title)
     subtitle = sanitize_name(subtitle)
     r1_count = size // 2
-    width = MARGIN * 2 + rounds * BOX_W + (rounds - 1) * GAP_X
-    height = HEADER + r1_count * (BOX_H + GAP_Y) - GAP_Y + MARGIN + 20
+
+    # small brackets (1-2 rounds) get padded to a minimum width so the
+    # header never crowds; the grid centers itself in any spare space
+    grid_w = rounds * BOX_W + (rounds - 1) * GAP_X
+    width = max(MARGIN * 2 + grid_w, 620)
+    grid_x0 = max(MARGIN, (width - grid_w) // 2)
+
+    # header rows: title, subtitle, then (only when decided) a champion
+    # line on its own row so nothing can ever overlap
+    header = 168 if champion is not None else 136
+    height = header + r1_count * (BOX_H + GAP_Y) - GAP_Y + MARGIN + 20
 
     img = Image.new("RGB", (width, height), BG)
     draw = ImageDraw.Draw(img)
@@ -116,33 +124,31 @@ def render_bracket(
     f_side = _font(14, bold=True)
     f_foot = _font(13)
 
-    # header
-    draw.text((MARGIN, 26), title, font=f_title, fill=TEXT)
-    draw.text((MARGIN, 66), subtitle, font=f_sub, fill=DIM)
+    draw.text((MARGIN, 24), title, font=f_title, fill=TEXT)
+    draw.text((MARGIN, 64), subtitle, font=f_sub, fill=DIM)
     if champion is not None:
-        champ_text = f"CHAMPION: {sanitize_name(names.get(champion, '?'))}"
-        tl = draw.textlength(champ_text, font=_font(19, bold=True))
-        draw.text((width - MARGIN - tl, 34), champ_text, font=_font(19, bold=True), fill=GOLD)
-        draw.line(
-            (width - MARGIN - tl, 62, width - MARGIN, 62), fill=GOLD, width=2
-        )
+        f_champ = _font(19, bold=True)
+        champ_text = f"CHAMPION   {sanitize_name(names.get(champion, '?'))}"
+        draw.text((MARGIN, 94), champ_text, font=f_champ, fill=GOLD)
+        tl = draw.textlength(champ_text, font=f_champ)
+        draw.line((MARGIN, 122, MARGIN + tl, 122), fill=GOLD, width=2)
 
     # geometry: vertical centers per (round, pos)
     centers: dict[tuple[int, int], float] = {}
     for i in range(r1_count):
-        centers[(1, i)] = HEADER + i * (BOX_H + GAP_Y) + BOX_H / 2
+        centers[(1, i)] = header + i * (BOX_H + GAP_Y) + BOX_H / 2
     for r in range(2, rounds + 1):
         for pos in range(size // (2 ** r)):
             centers[(r, pos)] = (centers[(r - 1, 2 * pos)] + centers[(r - 1, 2 * pos + 1)]) / 2
 
     def col_x(r: int) -> int:
-        return MARGIN + (r - 1) * (BOX_W + GAP_X)
+        return grid_x0 + (r - 1) * (BOX_W + GAP_X)
 
     # round labels
     for r in range(1, rounds + 1):
         label = round_label(r, rounds)
         tl = draw.textlength(label, font=f_round)
-        draw.text((col_x(r) + (BOX_W - tl) / 2, HEADER - 34), label, font=f_round, fill=BLURPLE)
+        draw.text((col_x(r) + (BOX_W - tl) / 2, header - 30), label, font=f_round, fill=BLURPLE)
 
     # connectors first (under the boxes)
     for m in matches:
