@@ -30,23 +30,17 @@ LEAVE_ID = "tpcd_tourney_leave"
 TEAM_REG_ID = "tpcd_team_register"
 TEAM_WITHDRAW_ID = "tpcd_team_withdraw"
 
-WIN_LINES = [
-    "Absolutely cooked. 🔥",
-    "Built different.",
-    "A masterclass, honestly.",
-    "The bracket trembles.",
-    "Someone check if that was even fair.",
-    "Certified demon hours.",
-    "Clean. Surgical. Ruthless.",
-]
-LOSE_LINES = [
-    "You made them earn every bit of it.",
-    "Heads high — that was a proper scrap.",
-    "Revenge arc loading…",
-    "GGs only. Run it back next season.",
-    "Down, but never out.",
-    "The bracket was rigged (probably).",
-]
+def result_verb(score: str | None) -> str:
+    """Human phrasing for a result line, score-aware when possible."""
+    if score:
+        tail = score.split("-")[-1].strip()
+        if tail == "0":
+            return "swept"
+        if tail.isdigit() and int(tail) >= 1 and score[0].isdigit():
+            first = score.split("-")[0].strip()
+            if first.isdigit() and int(first) - int(tail) == 1:
+                return "edged out"
+    return random.choice(["beat", "took down", "got past"])
 
 
 class SoloRegView(discord.ui.View):
@@ -235,13 +229,6 @@ class Tournaments(commands.Cog):
             return await self.db.team_member_ids(t["id"], entrant_id)
         return [entrant_id]
 
-    async def entrant_ping(self, t, entrant_id: int, names: dict[int, str]) -> str:
-        ids = await self.entrant_member_ids(t, entrant_id)
-        pings = " ".join(f"<@{u}>" for u in ids)
-        if t["mode"] == "team":
-            return f"**{names.get(entrant_id, '?')}** ({pings})"
-        return pings
-
     async def register_team(
         self, t, captain: discord.Member, mates: list[discord.Member], team_name: str
     ) -> tuple[bool, str]:
@@ -362,18 +349,16 @@ class Tournaments(commands.Cog):
         embed = discord.Embed(color=discord.Color.gold())
         if t["status"] == "finished":
             embed.description = (
-                f"🏁 **{t['name']}** is complete — "
-                f"**{names.get(t['winner_user_id'], '?')}** takes the crown!"
+                f"Final bracket. **{names.get(t['winner_user_id'], '?')}** 🏆"
             )
         else:
             stage = round_label(min(cur_rounds), rounds).title() if cur_rounds else "…"
-            embed.description = (
-                f"⚔️ **{stage}** · {done}/{len(matches)} matches played"
-            )
+            waiting = ""
             if ready:
-                nums = ", ".join(f"`#{m['match_no']}`" for m in ready)
-                embed.add_field(name="Awaiting results", value=nums, inline=False)
-            embed.set_footer(text="Staff report results with /tournament report")
+                nums = ", ".join(f"#{m['match_no']}" for m in ready)
+                waiting = f" · waiting on {nums}"
+            embed.description = f"**{stage}** · {done} of {len(matches)} matches played{waiting}"
+            embed.set_footer(text="Staff: /tournament report")
 
         if (t["bracket_size"] or 0) <= MAX_BRACKET_SIZE:
             try:
@@ -409,20 +394,27 @@ class Tournaments(commands.Cog):
             return
         names = await self.names_map(t)
         rounds = t["rounds"] or 1
-        lines = [heading]
+        lines = []
         for no in match_nos:
             m = await self.db.get_match(t["id"], no)
             if m is None or m["p1_user_id"] is None or m["p2_user_id"] is None:
                 continue
-            p1 = await self.entrant_ping(t, m["p1_user_id"], names)
-            p2 = await self.entrant_ping(t, m["p2_user_id"], names)
-            lines.append(
-                f"⚔️ `#{m['match_no']}` · {round_label(m['round'], rounds).title()} — {p1} vs {p2}"
-            )
-        lines.append("*Play your set, then staff reports with `/tournament report`.*")
-        await channel.send(
-            "\n".join(lines), allowed_mentions=discord.AllowedMentions(users=True)
-        )
+            label = round_label(m["round"], rounds).title()
+            if t["mode"] == "team":
+                n1, n2 = names.get(m["p1_user_id"], "?"), names.get(m["p2_user_id"], "?")
+                p1 = " ".join(f"<@{u}>" for u in await self.entrant_member_ids(t, m["p1_user_id"]))
+                p2 = " ".join(f"<@{u}>" for u in await self.entrant_member_ids(t, m["p2_user_id"]))
+                lines.append(f"`#{m['match_no']}` {label}: **{n1}** vs **{n2}**")
+                lines.append(f"{p1} vs {p2}")
+            else:
+                lines.append(
+                    f"`#{m['match_no']}` {label}: <@{m['p1_user_id']}> vs <@{m['p2_user_id']}>"
+                )
+            lines.append("")
+        if not lines:
+            return
+        body = "\n".join([heading, ""] + lines).rstrip()
+        await channel.send(body, allowed_mentions=discord.AllowedMentions(users=True))
 
     async def resolve(self, interaction: discord.Interaction, tid: int | None):
         if tid is not None:
@@ -580,14 +572,13 @@ class Tournaments(commands.Cog):
         t = await self.db.get_tournament(t["id"])
         kwargs = await self.bracket_message(t)
         await interaction.channel.send(
-            content=f"🏆 **{t['name']}** has started — {len(entrants)} {noun}, single elimination. "
-            "May the best win!",
+            content=f"**{t['name']}** is underway with {len(entrants)} {noun}. Bracket below 👇",
             **kwargs,
         )
         ready_rows = [m for m in await self.db.get_matches(t["id"]) if m["status"] == "ready"]
         await self.announce_ready(
             interaction.channel, t, [m["match_no"] for m in ready_rows],
-            "**First matchups — you're up:**",
+            "**Round 1 matchups.** Play your set and staff will report the result.",
         )
         await interaction.followup.send("Bracket posted.", ephemeral=True)
 
@@ -652,45 +643,49 @@ class Tournaments(commands.Cog):
         t = await self.db.get_tournament(t["id"])
         names = await self.names_map(t)
         rounds = t["rounds"] or 1
-
-        # result card: congrats + respect, everyone pinged
-        win_label = await self.entrant_ping(t, win_entrant, names)
-        lose_label = await self.entrant_ping(t, lose_entrant, names)
-        score_txt = f" `{score}`" if score else ""
-        await interaction.channel.send(
-            f"⚔️ **Match #{match} · {round_label(m['round'], rounds).title()}**{score_txt}\n"
-            f"🎉 {win_label} — {random.choice(WIN_LINES)}\n"
-            f"🫡 {lose_label} — {random.choice(LOSE_LINES)}",
-            allowed_mentions=discord.AllowedMentions(users=True),
-        )
+        win_name = names.get(win_entrant, "?")
+        lose_name = names.get(lose_entrant, "?")
+        win_pings = " ".join(f"<@{u}>" for u in await self.entrant_member_ids(t, win_entrant))
+        lose_pings = " ".join(f"<@{u}>" for u in await self.entrant_member_ids(t, lose_entrant))
+        score_txt = f" {score}" if score else ""
 
         if finished:
-            member_ids = await self.entrant_member_ids(t, win_entrant)
-            all_players = {
-                p["user_id"]: p["display_name"] for p in await self.db.get_participants(t["id"])
-            }
-            roster = [all_players.get(u, "?") for u in member_ids]
-            champ_ping = " ".join(f"<@{u}>" for u in member_ids)
+            # the champion post covers the final, no separate result card
             try:
-                buf = render_champion(t["name"], names.get(win_entrant, "?"), roster)
-                file = discord.File(buf, filename="champion.png")
-                await interaction.channel.send(
-                    f"🏆 **{names.get(win_entrant, '?')}** wins **{t['name']}**! {champ_ping}\n"
-                    "GGs to everyone who entered.",
-                    file=file,
-                    allowed_mentions=discord.AllowedMentions(users=True),
+                member_ids = await self.entrant_member_ids(t, win_entrant)
+                all_players = {
+                    p["user_id"]: p["display_name"]
+                    for p in await self.db.get_participants(t["id"])
+                }
+                roster = [all_players.get(u, "?") for u in member_ids]
+                file = discord.File(
+                    render_champion(t["name"], win_name, roster), filename="champion.png"
                 )
             except Exception:  # noqa: BLE001
                 log.exception("Champion banner render failed")
-                await interaction.channel.send(
-                    f"🏆🏆 **{names.get(win_entrant, '?')}** wins **{t['name']}**! {champ_ping}",
-                    allowed_mentions=discord.AllowedMentions(users=True),
-                )
+                file = None
+            wins = "win" if t["mode"] == "team" else "wins"
+            final_score = f" ({score} in the final)" if score else ""
+            runner_word = "Runners-up" if t["mode"] == "team" else "Runner-up"
+            await interaction.channel.send(
+                f"🏆 **{win_name}** {wins} it all{final_score}! {win_pings}\n\n"
+                f"{runner_word}: **{lose_name}** {lose_pings}, great run.\n\n"
+                f"That's a wrap on **{t['name']}**. GGs everyone.",
+                file=file,
+                allowed_mentions=discord.AllowedMentions(users=True),
+            )
+        else:
+            await interaction.channel.send(
+                f"**Match #{match} · {round_label(m['round'], rounds).title()}**\n"
+                f"**{win_name}** {result_verb(score)} **{lose_name}**{score_txt}\n\n"
+                f"GG {win_pings} {lose_pings}",
+                allowed_mentions=discord.AllowedMentions(users=True),
+            )
 
         kwargs = await self.bracket_message(t)
         await interaction.channel.send(**kwargs)
         if promoted:
-            await self.announce_ready(interaction.channel, t, promoted, "**Up next:**")
+            await self.announce_ready(interaction.channel, t, promoted, "**Up next**")
         await interaction.followup.send(f"Recorded match #{match}.", ephemeral=True)
 
     @tournament.command(name="bracket", description="Show the current bracket")

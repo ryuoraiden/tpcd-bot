@@ -21,11 +21,33 @@ DIM = (122, 125, 133)
 GOLD = (240, 178, 50)
 BLURPLE = (139, 148, 255)
 
-BOX_W, BOX_H = 240, 66
-GAP_X, GAP_Y = 74, 26
+BOX_W, BOX_H = 276, 66
+GAP_X, GAP_Y = 78, 26
 MARGIN = 44
 HEADER = 112
 MAX_BRACKET_SIZE = 32  # above this, callers should fall back to text
+
+# Codepoint ranges the bundled fonts can't draw (CJK, emoji, symbols) —
+# stripped from display names so nicknames like "龍 Ryuo Raiden 神" or
+# emoji-decorated tags render as clean text instead of empty boxes.
+_UNRENDERABLE = (
+    (0x1F000, 0x1FAFF),  # emoji blocks
+    (0x2600, 0x27BF),    # misc symbols / dingbats
+    (0x2E80, 0x9FFF),    # CJK radicals through unified ideographs
+    (0xAC00, 0xD7AF),    # hangul
+    (0xF900, 0xFAFF),    # CJK compatibility
+    (0xFE00, 0xFE0F),    # variation selectors
+    (0x200B, 0x200D),    # zero-width chars
+    (0x3000, 0x303F),    # CJK punctuation
+)
+
+
+def sanitize_name(text: str, fallback: str = "?") -> str:
+    kept = "".join(
+        ch for ch in text if not any(a <= ord(ch) <= b for a, b in _UNRENDERABLE)
+    )
+    kept = " ".join(kept.split())
+    return kept or fallback
 
 _FONT_CANDIDATES = [
     # Ubuntu
@@ -77,6 +99,8 @@ def render_bracket(
     winner_user_id, status, score (entrant ids). size = bracket size (power of 2).
     """
     seeds = seeds or {}
+    title = sanitize_name(title)
+    subtitle = sanitize_name(subtitle)
     r1_count = size // 2
     width = MARGIN * 2 + rounds * BOX_W + (rounds - 1) * GAP_X
     height = HEADER + r1_count * (BOX_H + GAP_Y) - GAP_Y + MARGIN + 20
@@ -96,7 +120,7 @@ def render_bracket(
     draw.text((MARGIN, 26), title, font=f_title, fill=TEXT)
     draw.text((MARGIN, 66), subtitle, font=f_sub, fill=DIM)
     if champion is not None:
-        champ_text = f"CHAMPION: {names.get(champion, '?')}"
+        champ_text = f"CHAMPION: {sanitize_name(names.get(champion, '?'))}"
         tl = draw.textlength(champ_text, font=_font(19, bold=True))
         draw.text((width - MARGIN - tl, 34), champ_text, font=_font(19, bold=True), fill=GOLD)
         draw.line(
@@ -157,10 +181,11 @@ def render_bracket(
                 continue
             is_winner = done and m["winner_user_id"] == eid
             seed = seeds.get(eid)
-            label = f"{seed}  {names.get(eid, str(eid))}" if seed else names.get(eid, str(eid))
+            name = sanitize_name(names.get(eid, str(eid)))
+            label = f"{seed}  {name}" if seed else name
             color = GOLD if is_winner else (DIM if done else TEXT)
             font = f_name_b if is_winner else f_name
-            label = _fit(draw, label, font, BOX_W - 70)
+            label = _fit(draw, label, font, BOX_W - 64)
             draw.text((x + 14, row_cy), label, font=font, fill=color, anchor="lm")
             # right side: winner gets score / W, byes annotated
             if is_winner:
@@ -179,6 +204,9 @@ def render_bracket(
 
 def render_champion(tournament_name: str, champion_name: str, members: list[str]) -> BytesIO:
     """Gold banner for the tournament winner."""
+    champion_name = sanitize_name(champion_name)
+    members = [sanitize_name(m) for m in members]
+    tournament_name = sanitize_name(tournament_name)
     width, height = 900, 300
     img = Image.new("RGB", (width, height), BG)
     draw = ImageDraw.Draw(img)
