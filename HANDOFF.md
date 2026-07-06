@@ -67,6 +67,13 @@ Team: `/tournament create` (mode Team) posts an embed with no buttons. A captain
 
 Staff-gated: create/start/report/cancel/(register is open, unregister captain-or-staff). Open: join/leave/register/bracket/list. `tournament.py` is pure and covered by offline sims: solo 2-32 players and team 2-16 teams, each checking every match resolves, ping rosters are correct, and the top seed wins when the better seed always wins. DB migration (ADD COLUMN, tested idempotent + against a pre-existing DB) runs in `db.connect()`.
 
+### Duo + round robin + announce (2026-07-06)
+
+- **Sizes:** solo/duo/trio. `mode` stays 'solo'/'team'; `team_size` (1/2/3) is the source of truth. `team_size_of(t)`, `vs_label(t)` derive labels. Team registration flow (modal → UserSelect picker) is sized by `team_size` — the picker's min/max are set in `TeammatePickView.__init__`. `/tournament register` makes player3 optional.
+- **Round robin:** `tournaments.format` ('single_elim'/'round_robin'). Pure `build_round_robin` (circle method) + `round_robin_standings` (wins → game diff from scores → head-to-head) in `bot/tournament.py`. RR matches reuse the matches table with next pointers NULL and all status 'ready'; no advancement. Champion = top of final standings once every match is done. `render_standings` in bracket_render.py draws the table image. Cog dispatches on format: `display_message`, `_finish_report_rr` vs `_finish_report_elim`.
+- **/tournament announce:** promo card + `ParticipantButton` (DynamicItem, role id + player goal in custom_id, toggles PARTICIPANT_ROLE_ID = 1380414459050332160, live count via `role.members`, edits the "Signed up" field). Params: title, host, schedule, size, best_of, sponsor, min_players, coordinate_in, notes, ping_everyone. Needs Manage Roles + bot role above the participant role (same as self-roles).
+- Offline-tested: RR schedule (2-12 entrants, complete + no dupes), standings ranking, renders visually verified. Not yet live-tested against real Discord.
+
 ### UI layer (upgraded 2026-07-05)
 
 - **`bot/bracket_render.py`**: pure Pillow renderers. `render_bracket(...)` draws the full bracket as a Discord-dark PNG (round columns with QUARTERFINALS/SEMIFINALS/GRAND FINAL labels, seed numbers, gold winner rows, scores, elbow connectors, BYE/TBD states, CHAMPION strip); `render_champion(...)` draws a gold banner with team name + roster. Fonts: DejaVu (Ubuntu, `fonts-dejavu-core` installed on the server), Segoe/Arial on Windows, Pillow bundled fallback. Brackets over `MAX_BRACKET_SIZE` (32) fall back to the text embed, as does any render exception (try/except in `bracket_message`).

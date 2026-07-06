@@ -4,7 +4,7 @@ Custom bot for the TPCD (Teamer Pest Control Department) Discord server.
 
 **Feature 1: automated daily polls.** Posts one native Discord poll every day at 9:00 AM IST in #daily-polls from a 200-question bank, pings the Poll Ping role, captures results when each poll closes, and posts a weekly recap on Sundays. Zero daily ops required.
 
-**Feature 2: tournaments.** Single-elimination brackets for #tournament-hub, **solo (1v1) or 3v3 teams** (for Brawl Stars), with a proper UI: rendered bracket **images** (Discord-dark theme, seeds, scores, gold winners, champion strip), button registration (teams register via a name popup + member picker), match-ready announcement cards that ping who's up, score reporting, flavor-text result cards, and a gold champion banner image at the end.
+**Feature 2: tournaments.** For #tournament-hub, in **solo (1v1), duo (2v2), or trio (3v3)** across **single-elimination or round-robin** formats. Proper UI: rendered bracket and standings **images** (Discord-dark theme, seeds, scores, gold winners), button registration (teams register via a name popup + member picker), match announcement cards that ping who's up, score reporting, human result lines, and a gold champion banner. A `/tournament announce` command posts a promo card with a one-click sign-up button (grants the participant role, live count) and a sponsor field.
 
 ## Setup
 
@@ -57,19 +57,22 @@ All gated to Captain / 1st Commander / Manager (or anyone with Manage Server), r
 
 | Command | What it does |
 |---|---|
-| `/tournament create name game [mode]` | Create an event. `mode` = Solo (1v1) or Team (3v3), defaults solo |
+| `/tournament create name game [size] [format]` | Create an event. `size` = Solo/Duo/Trio, `format` = Single elimination or Round robin |
 | `/tournament join` / `leave` | (Solo) enter or drop, or use the Join/Leave buttons |
-| `/tournament register team_name player2 player3` | (Team) slash alternative to the Register team button |
+| `/tournament register team_name player2 [player3]` | (Team) slash alternative to the Register team button (player3 only for 3v3) |
 | `/tournament unregister` | (Team) captain or staff withdraws a team |
-| `/tournament start [id]` | Lock registration, random-seed, post the bracket image + first matchup pings |
-| `/tournament report match winner [score]` | Record a result (e.g. score `2-1`); in 3v3 pick any member of the winning team |
-| `/tournament bracket [id]` | Current bracket image (ephemeral) |
-| `/tournament list` | Recent tournaments, modes, champions |
+| `/tournament start [id]` | Lock registration, random-seed, post the bracket/standings image + opening matchups |
+| `/tournament report match winner [score]` | Record a result; in team modes pick any member of the winning team |
+| `/tournament bracket [id]` | Current bracket or standings image (ephemeral) |
+| `/tournament list` | Recent tournaments, modes, formats, champions |
 | `/tournament cancel [id]` | Cancel a tournament |
+| `/tournament announce ...` | Post a promo card with a sign-up button (participant role + live count) and sponsor |
 
-Any entrant count works: the bracket pads to the next power of two and gives top seeds first-round byes. Seeding is random at start. `id` defaults to the most recent active tournament, so you usually omit it.
+Elimination pads to the next power of two and gives top seeds first-round byes. Round robin has everyone play everyone, ranked by wins then game differential then head-to-head; the top of the final standings is champion. Seeding is random at start. `id` defaults to the most recent active tournament.
 
-**3v3 flow:** create with mode Team → captains hit **Register team** on the post (popup asks the team name, then a member picker for the 2 teammates) → `/tournament start` → after each set, staff `/tournament report` with any member of the winning team and an optional score. Every report posts a result card pinging both full rosters, announces the next match that became ready, and re-posts the updated bracket image. The final drops a champion banner.
+**Team flow (duo/trio):** create with size Duo or Trio → captains hit **Register team** on the post (popup asks the team name, then a member picker sized to the mode) → `/tournament start` → staff `/tournament report` each result with an optional score. Reports post a result line pinging both rosters and re-post the updated bracket/standings; the final drops a champion banner.
+
+**Announcements:** `/tournament announce` takes title, host, schedule, size, and optional best-of, sponsor/prize, min players, coordination channel, and notes. It posts a clean card with a **Join tournament** button that toggles the participant role and keeps a live signed-up count on the embed.
 
 ## How it behaves
 

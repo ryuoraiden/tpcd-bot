@@ -308,12 +308,12 @@ class Database:
 
     async def create_tournament(
         self, name: str, game: str, guild_id: int, channel_id: int, created_by: int,
-        mode: str = "solo", team_size: int = 1,
+        mode: str = "solo", team_size: int = 1, fmt: str = "single_elim",
     ) -> int:
         cur = await self.conn.execute(
             "INSERT INTO tournaments (name, game, guild_id, channel_id, created_by, created_at, "
-            "mode, team_size) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (name, game, guild_id, channel_id, created_by, utcnow(), mode, team_size),
+            "mode, team_size, format) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (name, game, guild_id, channel_id, created_by, utcnow(), mode, team_size, fmt),
         )
         await self.conn.commit()
         return cur.lastrowid

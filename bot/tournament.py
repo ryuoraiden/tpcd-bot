@@ -82,3 +82,82 @@ def build_bracket(participants: list[int]) -> tuple[int, int, list[BracketMatch]
                 nxt, nslot = None, None
             matches.append(BracketMatch(match_no[(r, pos)], r, pos, p1, p2, nxt, nslot))
     return size, rounds, matches
+
+
+def build_round_robin(entrants: list[int]) -> tuple[int, int, list[BracketMatch]]:
+    """Round-robin schedule via the circle method: every entrant plays every
+    other exactly once. Returns (n_entrants, n_rounds, matches). Matches have
+    no next pointers (winners don't advance; standings decide the champion).
+    """
+    ids = list(entrants)
+    n = len(ids)
+    if n < 2:
+        raise ValueError("need at least 2 entrants")
+    arr: list[int | None] = ids[:]
+    if n % 2 == 1:
+        arr.append(None)  # phantom entrant → whoever faces it sits out that round
+    m = len(arr)
+    rounds = m - 1
+    half = m // 2
+
+    matches: list[BracketMatch] = []
+    match_no = 1
+    lst = arr[:]
+    for r in range(rounds):
+        pos = 0
+        for i in range(half):
+            a, b = lst[i], lst[m - 1 - i]
+            if a is not None and b is not None:
+                matches.append(BracketMatch(match_no, r + 1, pos, a, b, None, None))
+                match_no += 1
+                pos += 1
+        # rotate everything except the first element one step clockwise
+        lst = [lst[0], lst[-1], *lst[1:-1]]
+    return n, rounds, matches
+
+
+def round_robin_standings(entrants: list[int], matches: list[dict]) -> list[dict]:
+    """Rank entrants by wins, then game differential (from scores), then
+    head-to-head. `matches` are dicts with p1_user_id, p2_user_id,
+    winner_user_id, score, status. Returns a list of standings rows sorted
+    best-first, each: {entrant, played, wins, losses, diff}.
+    """
+    stats = {
+        e: {"entrant": e, "played": 0, "wins": 0, "losses": 0, "diff": 0} for e in entrants
+    }
+    beat: set[tuple[int, int]] = set()
+    for mt in matches:
+        if mt.get("status") != "done" or mt.get("winner_user_id") is None:
+            continue
+        w = mt["winner_user_id"]
+        loser = mt["p2_user_id"] if w == mt["p1_user_id"] else mt["p1_user_id"]
+        if w not in stats or loser not in stats:
+            continue
+        stats[w]["wins"] += 1
+        stats[w]["played"] += 1
+        stats[loser]["losses"] += 1
+        stats[loser]["played"] += 1
+        beat.add((w, loser))
+        d = _score_margin(mt.get("score"))
+        stats[w]["diff"] += d
+        stats[loser]["diff"] -= d
+
+    ranked = sorted(stats.values(), key=lambda s: (-s["wins"], -s["diff"]))
+    # break exact (wins, diff) ties between adjacent pairs by head-to-head
+    for i in range(len(ranked) - 1):
+        a, b = ranked[i], ranked[i + 1]
+        if a["wins"] == b["wins"] and a["diff"] == b["diff"]:
+            if (b["entrant"], a["entrant"]) in beat:
+                ranked[i], ranked[i + 1] = ranked[i + 1], ranked[i]
+    return ranked
+
+
+def _score_margin(score: str | None) -> int:
+    """'2-1' -> 1. Unparseable or missing -> 0."""
+    if not score or "-" not in score:
+        return 0
+    a, _, b = score.partition("-")
+    try:
+        return abs(int(a.strip()) - int(b.strip()))
+    except ValueError:
+        return 0

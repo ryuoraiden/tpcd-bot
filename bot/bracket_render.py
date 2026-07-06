@@ -208,6 +208,88 @@ def render_bracket(
     return buf
 
 
+def render_standings(
+    title: str,
+    subtitle: str,
+    rows: list[dict],
+    names: dict[int, str],
+    champion: int | None = None,
+) -> BytesIO:
+    """Round-robin standings table. rows are ranked dicts with entrant,
+    played, wins, losses, diff. Champion row is highlighted gold.
+    """
+    title = sanitize_name(title)
+    subtitle = sanitize_name(subtitle)
+
+    row_h = 44
+    header_block = 150
+    pad = MARGIN
+    # column layout
+    x_rank = pad + 10
+    x_name = pad + 70
+    name_w = 300
+    x_p = x_name + name_w + 20
+    x_w = x_p + 60
+    x_l = x_w + 60
+    x_d = x_l + 70
+    width = x_d + 90 + pad
+    width = max(width, 620)
+    height = header_block + len(rows) * row_h + pad
+
+    img = Image.new("RGB", (width, height), BG)
+    draw = ImageDraw.Draw(img)
+
+    f_title = _font(30, bold=True)
+    f_sub = _font(16)
+    f_col = _font(14, bold=True)
+    f_cell = _font(18)
+    f_cell_b = _font(18, bold=True)
+    f_foot = _font(13)
+
+    draw.text((pad, 24), title, font=f_title, fill=TEXT)
+    draw.text((pad, 64), subtitle, font=f_sub, fill=DIM)
+
+    # column headers
+    hy = header_block - 30
+    draw.text((x_rank, hy), "#", font=f_col, fill=DIM)
+    draw.text((x_name, hy), "TEAM", font=f_col, fill=DIM)
+    draw.text((x_p, hy), "P", font=f_col, fill=DIM, anchor="ma")
+    draw.text((x_w, hy), "W", font=f_col, fill=DIM, anchor="ma")
+    draw.text((x_l, hy), "L", font=f_col, fill=DIM, anchor="ma")
+    draw.text((x_d, hy), "+/-", font=f_col, fill=DIM, anchor="ma")
+    draw.line((pad, header_block - 6, width - pad, header_block - 6), fill=BORDER, width=1)
+
+    for i, row in enumerate(rows):
+        y = header_block + i * row_h
+        cy = y + row_h / 2
+        eid = row["entrant"]
+        is_champ = champion is not None and eid == champion
+        if is_champ:
+            draw.rounded_rectangle(
+                (pad, y + 3, width - pad, y + row_h - 3), radius=8, fill=CARD
+            )
+        color = GOLD if is_champ else TEXT
+        font = f_cell_b if is_champ else f_cell
+        rank = f"{i + 1}"
+        draw.text((x_rank, cy), rank, font=font, fill=color, anchor="lm")
+        name = sanitize_name(names.get(eid, str(eid)))
+        name = _fit(draw, name, font, name_w)
+        draw.text((x_name, cy), name, font=font, fill=color, anchor="lm")
+        draw.text((x_p, cy), str(row["played"]), font=f_cell, fill=DIM, anchor="ma")
+        draw.text((x_w, cy), str(row["wins"]), font=font, fill=color, anchor="ma")
+        draw.text((x_l, cy), str(row["losses"]), font=f_cell, fill=DIM, anchor="ma")
+        diff = row["diff"]
+        diff_s = f"+{diff}" if diff > 0 else str(diff)
+        draw.text((x_d, cy), diff_s, font=f_cell, fill=DIM, anchor="ma")
+
+    draw.text((pad, height - 24), "TPCD · Round Robin", font=f_foot, fill=DIM)
+
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return buf
+
+
 def render_champion(tournament_name: str, champion_name: str, members: list[str]) -> BytesIO:
     """Gold banner for the tournament winner."""
     champion_name = sanitize_name(champion_name)
