@@ -122,7 +122,8 @@ Discord limits enforced by seed_check: question ≤300 chars, options 2-10, each
 - [ ] Verify NITC Bot's slash commands recovered after its next start (gotcha 1)
 - [ ] Occasional `scp` backup of `/opt/tpcd-bot/data/tpcd.db`
 - [ ] Bank runs dry around year-end at 1/day (200 questions, ~187 days from launch); low-pool DM gives warning at 14 left
-- [ ] Live-test tournaments end to end in Discord (create -> join -> start -> report to a champion); logic is unit-tested but not yet run against real Discord
+- [x] ~~Live-test tournaments~~ (done 2026-07-05: real 3v3 ran end to end, bracket/byes/champion all correct. Surfaced two render bugs, both fixed: CJK glyphs drew as boxes -> names now sanitized; long team names truncated -> wider boxes)
+- **Copy rule for all bot output:** owner rejects "AI-sounding" text. No theatrical flavor lines, no em dashes, sparse emoji, consolidated pings, blank lines between message sections. Write what a human organizer would type.
 - [ ] Tournament niceties not yet built: per-match score/best-of, letting participants self-report (currently staff-only), image bracket rendering (text embeds only), round-robin format (only single-elim), variable team size (hardcoded 3v3 via TEAM_SIZE in tournaments.py)
 - [ ] Future features (owner's doc, backburner): manager application pipeline with Commander voting, cross-club transfer tracking. Inter-club tournament automation is now DONE (single-elim). Add new features as cogs in the `COGS` list in `__main__.py`
 
