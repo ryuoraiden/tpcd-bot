@@ -45,16 +45,30 @@ def _ordinal(n: int) -> str:
     return f"{n}{suffix}"
 
 
+_TENURE_UNITS = [
+    ("year", 31536000),
+    ("month", 2592000),
+    ("day", 86400),
+    ("hour", 3600),
+    ("minute", 60),
+    ("second", 1),
+]
+
+
 def _fmt_duration(joined_at: datetime | None) -> str | None:
+    """Exact tenure as the two most significant units, e.g.
+    '4 months, 12 days' or '5 minutes, 6 seconds'."""
     if joined_at is None:
         return None
-    days = (datetime.now(timezone.utc) - joined_at).days
-    if days < 1:
-        return "less than a day"
-    if days < 60:
-        return f"{days} day{'s' if days != 1 else ''}"
-    months, rem = divmod(days, 30)
-    return f"about {months} months" if rem < 15 else f"about {months + 1} months"
+    secs = max(0, int((datetime.now(timezone.utc) - joined_at).total_seconds()))
+    parts = []
+    for name, size in _TENURE_UNITS:
+        qty, secs = divmod(secs, size)
+        if qty:
+            parts.append(f"{qty} {name}{'s' if qty != 1 else ''}")
+    if not parts:
+        return "less than a second"
+    return ", ".join(parts[:2])
 
 
 class Greetings(commands.Cog):
