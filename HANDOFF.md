@@ -67,6 +67,11 @@ Team: `/tournament create` (mode Team) posts an embed with no buttons. A captain
 
 Staff-gated: create/start/report/cancel/(register is open, unregister captain-or-staff). Open: join/leave/register/bracket/list. `tournament.py` is pure and covered by offline sims: solo 2-32 players and team 2-16 teams, each checking every match resolves, ping rosters are correct, and the top seed wins when the better seed always wins. DB migration (ADD COLUMN, tested idempotent + against a pre-existing DB) runs in `db.connect()`.
 
+### Scramble / random teams (2026-07-06)
+
+- New `mode='scramble'`: players sign up solo (SoloRegView, `registers_individually(t)` covers solo+scramble), then `/tournament start` calls `_form_scramble_teams`: shuffles participants, groups into `len//team_size` teams (leftovers spread as +1 subs, so every team >= team_size), creates team rows, `assign_participant_team` on each, then `set_tournament_mode(tid, 'team')` — so all post-start logic is plain team mode. Needs >= 2*team_size players. `_teams_drawn_text` posts the reveal with pings. `team_size_of` and `registers_individually` treat scramble correctly.
+- create size choices encode scramble as "s2"/"s3" (parsed in create). Offline-tested: everyone placed, teams >= size, flips to team, runs a bracket.
+
 ### Duo + round robin + announce (2026-07-06)
 
 - **Sizes:** solo/duo/trio. `mode` stays 'solo'/'team'; `team_size` (1/2/3) is the source of truth. `team_size_of(t)`, `vs_label(t)` derive labels. Team registration flow (modal → UserSelect picker) is sized by `team_size` — the picker's min/max are set in `TeammatePickView.__init__`. `/tournament register` makes player3 optional.

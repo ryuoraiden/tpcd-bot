@@ -359,6 +359,10 @@ class Database:
         await self.conn.execute("UPDATE tournaments SET status = ? WHERE id = ?", (status, tid))
         await self.conn.commit()
 
+    async def set_tournament_mode(self, tid: int, mode: str) -> None:
+        await self.conn.execute("UPDATE tournaments SET mode = ? WHERE id = ?", (mode, tid))
+        await self.conn.commit()
+
     async def set_tournament_bracket(self, tid: int, size: int, rounds: int) -> None:
         await self.conn.execute(
             "UPDATE tournaments SET bracket_size = ?, rounds = ?, status = 'running' WHERE id = ?",
@@ -395,6 +399,17 @@ class Database:
             "SELECT 1 FROM participants WHERE tournament_id = ? AND user_id = ?", (tid, user_id)
         ) as cur:
             return await cur.fetchone() is not None
+
+    async def assign_participant_team(
+        self, tid: int, user_id: int, team_id: int, is_captain: int
+    ) -> None:
+        """Attach an already-registered solo participant to a team (scramble draw)."""
+        await self.conn.execute(
+            "UPDATE participants SET team_id = ?, is_captain = ? "
+            "WHERE tournament_id = ? AND user_id = ?",
+            (team_id, is_captain, tid, user_id),
+        )
+        await self.conn.commit()
 
     async def remove_participant(self, tid: int, user_id: int) -> bool:
         cur = await self.conn.execute(

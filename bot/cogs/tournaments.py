@@ -41,7 +41,14 @@ TEAM_WITHDRAW_ID = "tpcd_team_withdraw"
 
 
 def team_size_of(t) -> int:
-    return t["team_size"] or DEFAULT_TEAM_SIZE if t["mode"] == "team" else 1
+    if t["mode"] in ("team", "scramble"):
+        return t["team_size"] or DEFAULT_TEAM_SIZE
+    return 1
+
+
+def registers_individually(t) -> bool:
+    """True when people sign up solo: pure solo, or scramble (drawn into teams)."""
+    return t["mode"] in ("solo", "scramble")
 
 
 def vs_label(t) -> str:
@@ -383,10 +390,16 @@ class Tournaments(commands.Cog):
     async def registration_embed(self, tid: int) -> discord.Embed:
         t = await self.db.get_tournament(tid)
         fmt_name = "Round robin" if is_round_robin(t) else "Single elimination"
+        size = team_size_of(t)
         if t["mode"] == "team":
-            size = team_size_of(t)
             fmt = f"⚔️ {fmt_name} · 👥 **{size}v{size} teams**"
             how = f"Captains: hit **Register team**, name your squad, pick your {size - 1} teammate(s)."
+        elif t["mode"] == "scramble":
+            fmt = f"⚔️ {fmt_name} · 🎲 **{size}v{size}, random teams**"
+            how = (
+                f"Hit **Join** to enter on your own. When it starts, everyone is drawn into "
+                f"random teams of {size} — no need to find a squad first."
+            )
         else:
             fmt = f"⚔️ {fmt_name} · 👤 **solo (1v1)**"
             how = "Hit **Join** to enter."
@@ -617,6 +630,8 @@ class Tournaments(commands.Cog):
             app_commands.Choice(name="Solo (1v1)", value="1"),
             app_commands.Choice(name="Duo (2v2)", value="2"),
             app_commands.Choice(name="Trio (3v3)", value="3"),
+            app_commands.Choice(name="Random Trios (3v3, drawn at start)", value="s3"),
+            app_commands.Choice(name="Random Duos (2v2, drawn at start)", value="s2"),
         ],
         format=[
             app_commands.Choice(name="Single elimination", value="single_elim"),
@@ -629,14 +644,18 @@ class Tournaments(commands.Cog):
         size: app_commands.Choice[str] | None = None,
         format: app_commands.Choice[str] | None = None,
     ) -> None:
-        ts = int(size.value) if size else 1
-        mode_val = "solo" if ts == 1 else "team"
+        raw = size.value if size else "1"
+        if raw.startswith("s"):
+            ts, mode_val = int(raw[1:]), "scramble"
+        else:
+            ts = int(raw)
+            mode_val = "solo" if ts == 1 else "team"
         fmt = format.value if format else "single_elim"
         tid = await self.db.create_tournament(
             name, game.value, interaction.guild_id, interaction.channel_id, interaction.user.id,
             mode=mode_val, team_size=ts, fmt=fmt,
         )
-        view = SoloRegView(self) if mode_val == "solo" else TeamRegView(self)
+        view = SoloRegView(self) if registers_individually({"mode": mode_val}) else TeamRegView(self)
         msg = await interaction.channel.send(embed=await self.registration_embed(tid), view=view)
         await self.db.set_tournament_message(tid, msg.id)
         await interaction.response.send_message(
@@ -651,7 +670,7 @@ class Tournaments(commands.Cog):
                 "No tournament is open for registration right now.", ephemeral=True
             )
             return
-        if t["mode"] == "team":
+        if not registers_individually(t):
             await interaction.response.send_message(
                 f"This is a {vs_label(t)} team tournament — use the **Register team** button on the "
                 "tournament post, or `/tournament register`.", ephemeral=True
@@ -661,8 +680,12 @@ class Tournaments(commands.Cog):
             t["id"], interaction.user.id, interaction.user.display_name
         )
         await self.refresh_registration(t["id"])
+        if t["mode"] == "scramble":
+            reply = f"You're in **{t['name']}**! You'll be drawn into a team when it starts."
+        else:
+            reply = f"You're in **{t['name']}**!"
         await interaction.response.send_message(
-            f"You're in **{t['name']}**!" if ok else "You already joined.", ephemeral=True
+            reply if ok else "You already joined.", ephemeral=True
         )
 
     @tournament.command(name="leave", description="Leave the active solo tournament")
@@ -735,6 +758,15 @@ class Tournaments(commands.Cog):
             await interaction.followup.send(f"**{t['name']}** is already {t['status']}.", ephemeral=True)
             return
 
+        # scramble: draw the solo sign-ups into random teams, then play as a team event
+        was_scramble = t["mode"] == "scramble"
+        if was_scramble:
+            ok, err = await self._form_scramble_teams(t)
+            if not ok:
+                await interaction.followup.send(err, ephemeral=True)
+                return
+            t = await self.db.get_tournament(t["id"])  # mode is now 'team'
+
         if t["mode"] == "team":
             entrants = await self.db.get_teams(t["id"])
             noun = "teams"
@@ -744,6 +776,12 @@ class Tournaments(commands.Cog):
         if len(entrants) < 2:
             await interaction.followup.send(f"Need at least 2 {noun} to start.", ephemeral=True)
             return
+
+        if was_scramble:
+            await interaction.channel.send(
+                await self._teams_drawn_text(t),
+                allowed_mentions=discord.AllowedMentions(users=True),
+            )
 
         seeded = list(entrants)
         random.shuffle(seeded)
@@ -797,6 +835,40 @@ class Tournaments(commands.Cog):
             "**Opening matchups.** Play your sets and staff will report the results.",
         )
         await interaction.followup.send("Started.", ephemeral=True)
+
+    async def _form_scramble_teams(self, t) -> tuple[bool, str | None]:
+        """Draw solo sign-ups into random teams, then flip the tournament to
+        team mode. Returns (ok, error message)."""
+        ts = team_size_of(t)
+        people = await self.db.get_participants(t["id"])
+        if len(people) < 2 * ts:
+            return False, (
+                f"Need at least {2 * ts} players to draw random {ts}v{ts} teams "
+                f"({len(people)} signed up)."
+            )
+        people = list(people)
+        random.shuffle(people)
+        num_teams = len(people) // ts  # every team ends up with ts or ts+1 players
+        groups: list[list] = [[] for _ in range(num_teams)]
+        for i, p in enumerate(people):
+            groups[i % num_teams].append(p)
+        for idx, group in enumerate(groups, 1):
+            team_id = await self.db.create_team(t["id"], f"Team {idx}", group[0]["user_id"])
+            for j, p in enumerate(group):
+                await self.db.assign_participant_team(
+                    t["id"], p["user_id"], team_id, 1 if j == 0 else 0
+                )
+        await self.db.set_tournament_mode(t["id"], "team")
+        return True, None
+
+    async def _teams_drawn_text(self, t) -> str:
+        teams = await self.db.get_teams(t["id"])
+        lines = ["🎲 **The teams have been drawn:**", ""]
+        for tm in teams:
+            members = await self.db.team_members(t["id"], tm["id"])
+            pings = " ".join(f"<@{m['user_id']}>" for m in members)
+            lines.append(f"**{tm['name']}** — {pings}")
+        return "\n".join(lines)[:1990]
 
     @tournament.command(name="report", description="Report a match result")
     @app_commands.describe(

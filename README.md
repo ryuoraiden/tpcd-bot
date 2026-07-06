@@ -4,7 +4,7 @@ Custom bot for the TPCD (Teamer Pest Control Department) Discord server.
 
 **Feature 1: automated daily polls.** Posts one native Discord poll every day at 9:00 AM IST in #daily-polls from a 200-question bank, pings the Poll Ping role, captures results when each poll closes, and posts a weekly recap on Sundays. Zero daily ops required.
 
-**Feature 2: tournaments.** For #tournament-hub, in **solo (1v1), duo (2v2), or trio (3v3)** across **single-elimination or round-robin** formats. Proper UI: rendered bracket and standings **images** (Discord-dark theme, seeds, scores, gold winners), button registration (teams register via a name popup + member picker), match announcement cards that ping who's up, score reporting, human result lines, and a gold champion banner. A `/tournament announce` command posts a promo card with a one-click sign-up button (grants the participant role, live count) and a sponsor field.
+**Feature 2: tournaments.** For #tournament-hub, in **solo (1v1), duo (2v2), trio (3v3), or random teams** (sign up solo, get drawn into teams at start) across **single-elimination or round-robin** formats. Proper UI: rendered bracket and standings **images** (Discord-dark theme, seeds, scores, gold winners), button registration (teams register via a name popup + member picker), match announcement cards that ping who's up, score reporting, human result lines, and a gold champion banner. A `/tournament announce` command posts a promo card with a one-click sign-up button (grants the participant role, live count) and a sponsor field.
 
 ## Setup
 
@@ -57,7 +57,7 @@ All gated to Captain / 1st Commander / Manager (or anyone with Manage Server), r
 
 | Command | What it does |
 |---|---|
-| `/tournament create name game [size] [format]` | Create an event. `size` = Solo/Duo/Trio, `format` = Single elimination or Round robin |
+| `/tournament create name game [size] [format]` | Create an event. `size` = Solo/Duo/Trio or Random Duos/Trios, `format` = Single elimination or Round robin |
 | `/tournament join` / `leave` | (Solo) enter or drop, or use the Join/Leave buttons |
 | `/tournament register team_name player2 [player3]` | (Team) slash alternative to the Register team button (player3 only for 3v3) |
 | `/tournament unregister` | (Team) captain or staff withdraws a team |
@@ -71,6 +71,8 @@ All gated to Captain / 1st Commander / Manager (or anyone with Manage Server), r
 Elimination pads to the next power of two and gives top seeds first-round byes. Round robin has everyone play everyone, ranked by wins then game differential then head-to-head; the top of the final standings is champion. Seeding is random at start. `id` defaults to the most recent active tournament.
 
 **Team flow (duo/trio):** create with size Duo or Trio → captains hit **Register team** on the post (popup asks the team name, then a member picker sized to the mode) → `/tournament start` → staff `/tournament report` each result with an optional score. Reports post a result line pinging both rosters and re-post the updated bracket/standings; the final drops a champion banner.
+
+**Random teams (scramble):** create with size Random Duos or Random Trios → players hit **Join** individually (no squad needed) → `/tournament start` shuffles everyone into random teams of the chosen size, posts a "teams have been drawn" reveal pinging each new team, then runs exactly like a team event. Needs at least two full teams' worth of players; leftover players are spread across teams as subs so everyone is placed.
 
 **Announcements:** `/tournament announce` takes title, host, schedule, size, and optional best-of, sponsor/prize, min players, coordination channel, and notes. It posts a clean card with a **Join tournament** button that toggles the participant role and keeps a live signed-up count on the embed.
 
