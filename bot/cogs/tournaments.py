@@ -1042,7 +1042,8 @@ class Tournaments(commands.Cog):
         schedule="When it runs, e.g. Sunday 24th, 8:00 PM IST",
         size="Team size",
         best_of="Match format",
-        sponsor="Prize / sponsor, e.g. Brawl Pass gifted by @Executor",
+        prize="What the winner gets, e.g. Brawl Pass",
+        sponsor="Who is providing the prize, e.g. @Executor",
         min_players="Minimum players needed to run it",
         coordinate_in="Channel where brackets and match talk happen",
         notes="Any extra details",
@@ -1065,6 +1066,7 @@ class Tournaments(commands.Cog):
         self, interaction: discord.Interaction,
         title: str, host: discord.Member, schedule: str, size: app_commands.Choice[str],
         best_of: app_commands.Choice[str] | None = None,
+        prize: str | None = None,
         sponsor: str | None = None,
         min_players: int | None = None,
         coordinate_in: discord.TextChannel | None = None,
@@ -1086,8 +1088,13 @@ class Tournaments(commands.Cog):
         else:
             entry = "Solo or as a full squad, both are fine. No team? Sign up and find one."
         embed.add_field(name="Entry", value=entry, inline=True)
-        if sponsor:
-            embed.add_field(name="🎁 Prize", value=sponsor, inline=False)
+        if prize and sponsor:
+            embed.add_field(name="🎁 Prize", value=prize, inline=True)
+            embed.add_field(name="🤝 Sponsor", value=sponsor, inline=True)
+        elif prize:
+            embed.add_field(name="🎁 Prize", value=prize, inline=False)
+        elif sponsor:
+            embed.add_field(name="🤝 Sponsor", value=sponsor, inline=False)
         role = interaction.guild.get_role(PARTICIPANT_ROLE_ID)
         current = len(role.members) if role else 0
         signup_val = f"**{current}**" + (
