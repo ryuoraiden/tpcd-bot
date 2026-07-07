@@ -13,6 +13,9 @@ from __future__ import annotations
 import logging
 import random
 import re
+from datetime import datetime, timedelta
+from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import discord
 from discord import app_commands
@@ -26,6 +29,7 @@ from ..bracket_render import (
     round_label,
 )
 from ..checks import is_staff, staff_only
+from ..config import config
 from ..tournament import build_bracket, build_round_robin, round_robin_standings
 
 log = logging.getLogger(__name__)
@@ -33,6 +37,7 @@ log = logging.getLogger(__name__)
 GAMES = ["Brawl Stars", "Clash Royale", "Other"]
 DEFAULT_TEAM_SIZE = 3
 PARTICIPANT_ROLE_ID = 1380414459050332160
+EVENT_BANNER = Path(__file__).parent.parent / "data" / "assets" / "welcome_banner.png"
 
 JOIN_ID = "tpcd_tourney_join"
 LEAVE_ID = "tpcd_tourney_leave"
@@ -1107,6 +1112,111 @@ class Tournaments(commands.Cog):
             allowed_mentions=discord.AllowedMentions(everyone=ping_everyone),
         )
         await interaction.response.send_message("Announcement posted.", ephemeral=True)
+
+    @tournament.command(
+        name="schedule",
+        description="Create a Discord event (shows local time + sends reminders)",
+    )
+    @app_commands.describe(
+        date="Date, YYYY-MM-DD",
+        time="Start time, 24h HH:MM",
+        title="Event name (defaults to the active tournament)",
+        duration_hours="How long to block out (default 2)",
+        location="Where it happens (default: this channel)",
+        description="Extra details shown on the event",
+        timezone="IANA timezone (default Asia/Kolkata)",
+        ping_participants="Ping the participant role with the schedule",
+    )
+    @staff_only()
+    async def schedule(
+        self, interaction: discord.Interaction, date: str, time: str,
+        title: str | None = None, duration_hours: int = 2, location: str | None = None,
+        description: str | None = None, timezone: str | None = None,
+        ping_participants: bool = False,
+    ) -> None:
+        if not interaction.guild.me.guild_permissions.manage_events:
+            await interaction.response.send_message(
+                "I need the **Manage Events** permission to create a scheduled event. "
+                "Staff: enable it for my role in Server Settings → Roles.", ephemeral=True
+            )
+            return
+        tzname = timezone or config.timezone
+        try:
+            tz = ZoneInfo(tzname)
+        except Exception:  # noqa: BLE001
+            await interaction.response.send_message(
+                f"Unknown timezone `{tzname}`. Use an IANA name like `Asia/Kolkata`.", ephemeral=True
+            )
+            return
+        try:
+            start = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M").replace(tzinfo=tz)
+        except ValueError:
+            await interaction.response.send_message(
+                "Couldn't read that. Date must be `YYYY-MM-DD` and time `HH:MM` (24h), "
+                "e.g. `2026-07-12` and `20:00`.", ephemeral=True
+            )
+            return
+        if start <= datetime.now(tz):
+            await interaction.response.send_message(
+                "That time is in the past. Pick a future date and time.", ephemeral=True
+            )
+            return
+
+        if not title:
+            active = await self.db.latest_active_tournament(interaction.guild_id)
+            title = active["name"] if active else None
+        if not title:
+            await interaction.response.send_message(
+                "No active tournament to name the event after — pass a `title`.", ephemeral=True
+            )
+            return
+
+        duration_hours = max(1, min(duration_hours, 24))
+        end = start + timedelta(hours=duration_hours)
+        loc = (location or f"#{interaction.channel.name}")[:100]
+
+        event_kwargs = {}
+        if EVENT_BANNER.exists():
+            try:
+                event_kwargs["image"] = EVENT_BANNER.read_bytes()
+            except OSError:
+                pass
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            event = await interaction.guild.create_scheduled_event(
+                name=title[:100],
+                start_time=start,
+                end_time=end,
+                entity_type=discord.EntityType.external,
+                location=loc,
+                privacy_level=discord.PrivacyLevel.guild_only,
+                description=(description or f"{title} — running in {loc}.")[:1000],
+                **event_kwargs,
+            )
+        except discord.Forbidden:
+            await interaction.followup.send(
+                "Discord blocked that — check I have **Manage Events**.", ephemeral=True
+            )
+            return
+        except discord.HTTPException as e:
+            await interaction.followup.send(f"Discord rejected the event: {e}", ephemeral=True)
+            return
+
+        unix = int(start.timestamp())
+        content = f"🗓️ **{title}** is scheduled.\n\n"
+        if ping_participants:
+            content += f"<@&{PARTICIPANT_ROLE_ID}>\n"
+        content += (
+            f"**When:** <t:{unix}:F> (<t:{unix}:R>)\n"
+            f"**Where:** {loc}\n\n"
+            f"Tap **Interested** on the event to get a reminder:\n{event.url}"
+        )
+        await interaction.channel.send(
+            content,
+            allowed_mentions=discord.AllowedMentions(roles=ping_participants),
+        )
+        await interaction.followup.send("Event created and posted.", ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:

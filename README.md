@@ -67,6 +67,7 @@ All gated to Captain / 1st Commander / Manager (or anyone with Manage Server), r
 | `/tournament list` | Recent tournaments, modes, formats, champions |
 | `/tournament cancel [id]` | Cancel a tournament |
 | `/tournament announce ...` | Post a promo card with a sign-up button (participant role + live count) and sponsor |
+| `/tournament schedule date time [title] ...` | Create a native Discord event (auto local-time, reminders, RSVP) and post the link |
 
 Elimination pads to the next power of two and gives top seeds first-round byes. Round robin has everyone play everyone, ranked by wins then game differential then head-to-head; the top of the final standings is champion. Seeding is random at start. `id` defaults to the most recent active tournament.
 
@@ -75,6 +76,8 @@ Elimination pads to the next power of two and gives top seeds first-round byes. 
 **Random teams (scramble):** create with size Random Duos or Random Trios → players hit **Join** individually (no squad needed) → `/tournament start` shuffles everyone into random teams of the chosen size, posts a "teams have been drawn" reveal pinging each new team, then runs exactly like a team event. Needs at least two full teams' worth of players; leftover players are spread across teams as subs so everyone is placed.
 
 **Announcements:** `/tournament announce` takes title, host, schedule, size, and optional best-of, sponsor/prize, min players, coordination channel, and notes. It posts a clean card with a **Join tournament** button that toggles the participant role and keeps a live signed-up count on the embed.
+
+**Scheduling:** `/tournament schedule date time` creates a native Discord Scheduled Event (defaults the name to the active tournament, timezone to Asia/Kolkata). The event shows in each member's local timezone, sends reminders, and tracks who's Interested. The bot also posts the event link with `<t:...>` timestamps (local time + live countdown). Needs the **Manage Events** permission. Optional `ping_participants` notifies the participant role.
 
 ## How it behaves
 

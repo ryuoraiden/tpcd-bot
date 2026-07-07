@@ -67,6 +67,10 @@ Team: `/tournament create` (mode Team) posts an embed with no buttons. A captain
 
 Staff-gated: create/start/report/cancel/(register is open, unregister captain-or-staff). Open: join/leave/register/bracket/list. `tournament.py` is pure and covered by offline sims: solo 2-32 players and team 2-16 teams, each checking every match resolves, ping rosters are correct, and the top seed wins when the better seed always wins. DB migration (ADD COLUMN, tested idempotent + against a pre-existing DB) runs in `db.connect()`.
 
+### /tournament schedule (2026-07-06)
+
+- Creates a native Discord Scheduled Event (`guild.create_scheduled_event`, entity_type external, guild_only, end_time = start + duration). Params: date (YYYY-MM-DD), time (HH:MM), title (defaults to active tournament name), duration_hours (clamped 1-24), location (defaults to `#channel`), description, timezone (IANA, default config.timezone), ping_participants. Sets the event cover to EVENT_BANNER (the welcome banner) when present. Posts the event link with `<t:unix:F>`/`<t:unix:R>` timestamps so it renders in each viewer's local time + countdown. **Needs Manage Events perm** (checked up front). Parsing/timezone logic offline-tested.
+
 ### Scramble / random teams (2026-07-06)
 
 - New `mode='scramble'`: players sign up solo (SoloRegView, `registers_individually(t)` covers solo+scramble), then `/tournament start` calls `_form_scramble_teams`: shuffles participants, groups into `len//team_size` teams (leftovers spread as +1 subs, so every team >= team_size), creates team rows, `assign_participant_team` on each, then `set_tournament_mode(tid, 'team')` — so all post-start logic is plain team mode. Needs >= 2*team_size players. `_teams_drawn_text` posts the reveal with pings. `team_size_of` and `registers_individually` treat scramble correctly.
