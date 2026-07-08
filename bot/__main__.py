@@ -42,9 +42,9 @@ class TPCDBot(commands.Bot):
     async def setup_hook(self) -> None:
         await self.db.connect()
         bank = json.loads(BANK_PATH.read_text(encoding="utf-8"))
-        inserted = await self.db.seed(bank)
-        if inserted:
-            log.info("Seeded %d new questions into the bank.", inserted)
+        inserted, retired = await self.db.seed(bank)
+        if inserted or retired:
+            log.info("Seed: +%d new questions, -%d retired.", inserted, retired)
         for cog in COGS:
             await self.load_extension(cog)
         synced = await self.tree.sync()

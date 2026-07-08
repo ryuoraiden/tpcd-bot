@@ -104,7 +104,7 @@ Staff-gated: create/start/report/cancel/(register is open, unregister captain-or
 
 ## Question bank design
 
-200 questions in 8 categories, weighted toward what the channel's history proved engages: debate bait and rivalry binaries. brawl_stars 35 (includes anti-teaming questions, on brand for this server), hot_takes 30, this_or_that 30, gaming_general 30, clash_royale 20, hypotheticals 20, sports_pop_culture 20, food 15.
+200 questions in 7 categories, weighted toward what the channel's history proved engages: debate bait and rivalry binaries. gaming_general 42, brawl_stars 35, hot_takes 34, this_or_that 34, hypotheticals 20, sports_pop_culture 20, food 15. (Clash Royale was retired 2026-07-07 — CR no longer relevant to TPCD. The bank carries `retired_categories`, and `db.seed` deletes unused questions in those categories on startup so a removed category actually leaves the live pool; already-posted questions are kept for history.)
 
 Channel rule 7 is NO repeat questions ever. The 13 polls posted manually before the bot existed are in `pre_used` in the JSON and seeded with `used_at` set, so they're unpickable. Avoid adding questions on already-used topics: favorite legendary brawler, house pets, song genres, boost perks, event choice, overrated foods, superpowers, space settlement, FIFA 26 teams, dogs vs cats.
 

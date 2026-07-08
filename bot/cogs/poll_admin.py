@@ -18,7 +18,6 @@ log = logging.getLogger(__name__)
 
 CATEGORIES = [
     "brawl_stars",
-    "clash_royale",
     "gaming_general",
     "hot_takes",
     "this_or_that",

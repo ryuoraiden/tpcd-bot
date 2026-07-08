@@ -151,10 +151,12 @@ class Database:
 
     # -- seeding ---------------------------------------------------------
 
-    async def seed(self, bank: dict[str, Any]) -> int:
+    async def seed(self, bank: dict[str, Any]) -> tuple[int, int]:
         """Insert bank questions not already present. Historical (pre-used)
         entries are stored with used_at set so they can never be picked.
-        Returns the number of newly inserted rows.
+        Then purge unused questions in any retired category (so removing a
+        category from the bank actually removes it from the live pool).
+        Returns (inserted, retired) counts.
         """
         inserted = 0
         for q in bank.get("questions", []):
@@ -170,8 +172,14 @@ class Database:
                 "VALUES (?, ?, ?, ?, 'preference', 'history', ?)",
                 (q["id"], q.get("category", "history"), q["question"], json.dumps(q.get("options", [])), q.get("used_at", utcnow())),
             )
+        retired = 0
+        for category in bank.get("retired_categories", []):
+            cur = await self.conn.execute(
+                "DELETE FROM questions WHERE category = ? AND used_at IS NULL", (category,)
+            )
+            retired += cur.rowcount
         await self.conn.commit()
-        return inserted
+        return inserted, retired
 
     # -- questions ---------------------------------------------------------
 
