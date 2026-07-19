@@ -4,6 +4,8 @@ Custom bot for the TPCD (Teamer Pest Control Department) Discord server.
 
 **Feature 1: automated daily polls.** Posts one native Discord poll every day at 9:00 AM IST in #daily-polls from a 200-question bank, pings the Poll Ping role, captures results when each poll closes, and posts a weekly recap on Sundays. Zero daily ops required.
 
+**Feature 3: giveaways.** Replaces Giveaway Boat: button entry with role requirements (up to 3, all/any logic) and bonus entries for a chosen role, live entrant count, a countdown that updates itself, auto-draw at the deadline with entrants re-validated (left the server or dropped the role = not drawn), reroll that excludes previous winners, and image support. Survives restarts: expired giveaways draw on startup.
+
 **Feature 2: tournaments.** For #tournament-hub, in **solo (1v1), duo (2v2), trio (3v3), or random teams** (sign up solo, get drawn into teams at start) across **single-elimination or round-robin** formats. Proper UI: rendered bracket and standings **images** (Discord-dark theme, seeds, scores, gold winners), button registration (teams register via a name popup + member picker), match announcement cards that ping who's up, score reporting, human result lines, and a gold champion banner. A `/tournament announce` command posts a promo card with a one-click sign-up button (grants the participant role, live count) and a sponsor field.
 
 ## Setup
@@ -68,6 +70,21 @@ All gated to Captain / 1st Commander / Manager (or anyone with Manage Server), r
 | `/tournament cancel [id]` | Cancel a tournament |
 | `/tournament announce ...` | Post a promo card with a sign-up button (participant role + live count) and sponsor |
 | `/tournament schedule date time [title] ...` | Create a native Discord event (auto local-time, reminders, RSVP) and post the link |
+
+### Giveaway commands
+
+`create`, `end`, `reroll`, `cancel`, `entries` are staff-gated; `list` is open.
+
+| Command | What it does |
+|---|---|
+| `/giveaway create prize duration ...` | Start one. Duration like `1d`, `12h`, `2h30m`. Optional: channel, host, winners, up to 3 required roles (all/any), bonus-entry role + count, image, description |
+| `/giveaway end [id]` | End now and draw |
+| `/giveaway reroll [id] [winners]` | Draw replacements, excluding previous winners |
+| `/giveaway cancel [id]` | Cancel, nobody wins |
+| `/giveaway list` | Active giveaways with countdowns |
+| `/giveaway entries [id]` | Who entered, with entry weights |
+
+Entrants click **Enter** (click again to leave). Requirement checks happen at click time with a clear "you're missing X" message, and again at draw time so dropping a role or leaving the server disqualifies. The bonus role multiplies chances (e.g. boosters get 2x). `id` defaults to the most recent giveaway.
 
 Elimination pads to the next power of two and gives top seeds first-round byes. Round robin has everyone play everyone, ranked by wins then game differential then head-to-head; the top of the final standings is champion. Seeding is random at start. `id` defaults to the most recent active tournament.
 

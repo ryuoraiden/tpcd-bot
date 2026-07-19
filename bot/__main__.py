@@ -26,6 +26,7 @@ COGS = [
     "bot.cogs.tournaments",
     "bot.cogs.greetings",
     "bot.cogs.self_roles",
+    "bot.cogs.giveaways",
 ]
 
 

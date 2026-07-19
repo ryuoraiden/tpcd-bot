@@ -83,6 +83,35 @@ CREATE TABLE IF NOT EXISTS teams (
     captain_user_id INTEGER NOT NULL,
     seed            INTEGER
 );
+CREATE TABLE IF NOT EXISTS giveaways (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    prize          TEXT NOT NULL,
+    description    TEXT,
+    host_id        INTEGER,
+    guild_id       INTEGER,
+    channel_id     INTEGER,
+    message_id     INTEGER,
+    winners_count  INTEGER NOT NULL DEFAULT 1,
+    required_roles TEXT,
+    role_logic     TEXT NOT NULL DEFAULT 'all',
+    bonus_role_id  INTEGER,
+    bonus_entries  INTEGER NOT NULL DEFAULT 0,
+    image_name     TEXT,
+    created_by     INTEGER,
+    created_at     TEXT NOT NULL,
+    ends_at        TEXT NOT NULL,
+    ended          INTEGER NOT NULL DEFAULT 0,
+    cancelled      INTEGER NOT NULL DEFAULT 0,
+    winners_json   TEXT
+);
+CREATE TABLE IF NOT EXISTS giveaway_entries (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    giveaway_id INTEGER NOT NULL REFERENCES giveaways(id),
+    user_id     INTEGER NOT NULL,
+    entries     INTEGER NOT NULL DEFAULT 1,
+    joined_at   TEXT NOT NULL,
+    UNIQUE(giveaway_id, user_id)
+);
 """
 
 # Applied on connect for tables that predate a column. Each is tried once;
@@ -557,3 +586,125 @@ class Database:
 
     async def team_names(self, tid: int) -> dict[int, str]:
         return {t["id"]: t["name"] for t in await self.get_teams(tid)}
+
+    # -- giveaways ---------------------------------------------------------
+
+    async def create_giveaway(
+        self, *, prize: str, description: str | None, host_id: int, guild_id: int,
+        channel_id: int, winners_count: int, required_roles: list[int], role_logic: str,
+        bonus_role_id: int | None, bonus_entries: int, image_name: str | None,
+        created_by: int, ends_at: str,
+    ) -> int:
+        cur = await self.conn.execute(
+            "INSERT INTO giveaways (prize, description, host_id, guild_id, channel_id, "
+            "winners_count, required_roles, role_logic, bonus_role_id, bonus_entries, "
+            "image_name, created_by, created_at, ends_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (prize, description, host_id, guild_id, channel_id, winners_count,
+             json.dumps(required_roles), role_logic, bonus_role_id, bonus_entries,
+             image_name, created_by, utcnow(), ends_at),
+        )
+        await self.conn.commit()
+        return cur.lastrowid
+
+    async def get_giveaway(self, gid: int) -> aiosqlite.Row | None:
+        async with self.conn.execute("SELECT * FROM giveaways WHERE id = ?", (gid,)) as cur:
+            return await cur.fetchone()
+
+    async def set_giveaway_message(self, gid: int, message_id: int) -> None:
+        await self.conn.execute(
+            "UPDATE giveaways SET message_id = ? WHERE id = ?", (message_id, gid)
+        )
+        await self.conn.commit()
+
+    async def latest_active_giveaway(self, guild_id: int) -> aiosqlite.Row | None:
+        async with self.conn.execute(
+            "SELECT * FROM giveaways WHERE guild_id = ? AND ended = 0 AND cancelled = 0 "
+            "ORDER BY id DESC LIMIT 1",
+            (guild_id,),
+        ) as cur:
+            return await cur.fetchone()
+
+    async def latest_giveaway(self, guild_id: int) -> aiosqlite.Row | None:
+        async with self.conn.execute(
+            "SELECT * FROM giveaways WHERE guild_id = ? ORDER BY id DESC LIMIT 1", (guild_id,)
+        ) as cur:
+            return await cur.fetchone()
+
+    async def active_giveaways(self, guild_id: int) -> list[aiosqlite.Row]:
+        async with self.conn.execute(
+            "SELECT * FROM giveaways WHERE guild_id = ? AND ended = 0 AND cancelled = 0 "
+            "ORDER BY ends_at",
+            (guild_id,),
+        ) as cur:
+            return list(await cur.fetchall())
+
+    async def unfinished_giveaways(self) -> list[aiosqlite.Row]:
+        async with self.conn.execute(
+            "SELECT * FROM giveaways WHERE ended = 0 AND cancelled = 0 AND message_id IS NOT NULL"
+        ) as cur:
+            return list(await cur.fetchall())
+
+    async def end_giveaway(self, gid: int, winners: list[int]) -> None:
+        await self.conn.execute(
+            "UPDATE giveaways SET ended = 1, winners_json = ? WHERE id = ?",
+            (json.dumps(winners), gid),
+        )
+        await self.conn.commit()
+
+    async def cancel_giveaway(self, gid: int) -> None:
+        await self.conn.execute("UPDATE giveaways SET cancelled = 1 WHERE id = ?", (gid,))
+        await self.conn.commit()
+
+    async def set_giveaway_winners(self, gid: int, winners: list[int]) -> None:
+        await self.conn.execute(
+            "UPDATE giveaways SET winners_json = ? WHERE id = ?", (json.dumps(winners), gid)
+        )
+        await self.conn.commit()
+
+    async def has_entry(self, gid: int, user_id: int) -> bool:
+        async with self.conn.execute(
+            "SELECT 1 FROM giveaway_entries WHERE giveaway_id = ? AND user_id = ?", (gid, user_id)
+        ) as cur:
+            return await cur.fetchone() is not None
+
+    async def add_entry(self, gid: int, user_id: int, entries: int) -> None:
+        await self.conn.execute(
+            "INSERT INTO giveaway_entries (giveaway_id, user_id, entries, joined_at) "
+            "VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(giveaway_id, user_id) DO UPDATE SET entries = excluded.entries",
+            (gid, user_id, entries, utcnow()),
+        )
+        await self.conn.commit()
+
+    async def remove_entry(self, gid: int, user_id: int) -> bool:
+        cur = await self.conn.execute(
+            "DELETE FROM giveaway_entries WHERE giveaway_id = ? AND user_id = ?", (gid, user_id)
+        )
+        await self.conn.commit()
+        return cur.rowcount > 0
+
+    async def get_entry(self, gid: int, user_id: int) -> aiosqlite.Row | None:
+        async with self.conn.execute(
+            "SELECT * FROM giveaway_entries WHERE giveaway_id = ? AND user_id = ?", (gid, user_id)
+        ) as cur:
+            return await cur.fetchone()
+
+    async def giveaway_entries(self, gid: int) -> list[aiosqlite.Row]:
+        async with self.conn.execute(
+            "SELECT * FROM giveaway_entries WHERE giveaway_id = ?", (gid,)
+        ) as cur:
+            return list(await cur.fetchall())
+
+    async def count_giveaway_entries(self, gid: int) -> int:
+        async with self.conn.execute(
+            "SELECT COUNT(*) AS n FROM giveaway_entries WHERE giveaway_id = ?", (gid,)
+        ) as cur:
+            return (await cur.fetchone())["n"]
+
+    async def list_giveaways(self, guild_id: int, limit: int = 10) -> list[aiosqlite.Row]:
+        async with self.conn.execute(
+            "SELECT * FROM giveaways WHERE guild_id = ? ORDER BY id DESC LIMIT ?",
+            (guild_id, limit),
+        ) as cur:
+            return list(await cur.fetchall())

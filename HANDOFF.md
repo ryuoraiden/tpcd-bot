@@ -67,6 +67,15 @@ Team: `/tournament create` (mode Team) posts an embed with no buttons. A captain
 
 Staff-gated: create/start/report/cancel/(register is open, unregister captain-or-staff). Open: join/leave/register/bracket/list. `tournament.py` is pure and covered by offline sims: solo 2-32 players and team 2-16 teams, each checking every match resolves, ping rosters are correct, and the top seed wins when the better seed always wins. DB migration (ADD COLUMN, tested idempotent + against a pre-existing DB) runs in `db.connect()`.
 
+### Giveaways (2026-07-08, replaces Giveaway Boat)
+
+- `bot/giveaway.py` (pure): `parse_duration` ("1d6h" style, 10s..60d, rejects stray text) and `draw_winners` (weighted unique draw with exclusion; statistically verified). `bot/cogs/giveaways.py`: `/giveaway` group (create/end/reroll/cancel/list/entries), persistent `GiveawayView` (Enter toggles entry, Participants shows counts) resolved by message id.
+- Tables: `giveaways` (prize, host_id, winners_count, required_roles json + role_logic all/any, bonus_role_id + bonus_entries, image_name, ends_at, ended/cancelled, winners_json), `giveaway_entries` (UNIQUE giveaway/user, entries = weight).
+- Eligibility checked at click time (clear missing-roles message) AND re-validated at draw (`_valid_weights`: member still present, still qualifies, bonus recomputed). Reroll excludes all previously stored winners and appends new ones.
+- Ending: APScheduler DateTrigger per giveaway + startup sweep (same pattern as poll finalize; sweep wrapped in try/except so it can't die silently). Embed count edits throttled to one per 3s per giveaway (`refresh_message`).
+- Images: attachment re-uploaded onto the giveaway message, referenced via `attachment://` (slash-command attachment URLs expire, so storing the URL would break on long giveaways). Embed edits preserve attachments.
+- Uses `asyncio.create_task` (not bot.loop) in cog_load so the cog loads in offline tests.
+
 ### /tournament schedule (2026-07-06)
 
 - Creates a native Discord Scheduled Event (`guild.create_scheduled_event`, entity_type external, guild_only, end_time = start + duration). Params: date (YYYY-MM-DD), time (HH:MM), title (defaults to active tournament name), duration_hours (clamped 1-24), location (defaults to `#channel`), description, timezone (IANA, default config.timezone), ping_participants. Sets the event cover to EVENT_BANNER (the welcome banner) when present. Posts the event link with `<t:unix:F>`/`<t:unix:R>` timestamps so it renders in each viewer's local time + countdown. **Needs Manage Events perm** (checked up front). Parsing/timezone logic offline-tested.
