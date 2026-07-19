@@ -27,16 +27,16 @@ COGS = [
     "bot.cogs.greetings",
     "bot.cogs.self_roles",
     "bot.cogs.giveaways",
+    "bot.cogs.club_sync",
 ]
 
 
 class TPCDBot(commands.Bot):
     def __init__(self) -> None:
         intents = discord.Intents.default()
-        # privileged intent, needed only for welcome/goodbye; must also be
-        # enabled in the dev portal (Bot -> Server Members Intent)
-        if config.welcome_channel_id or config.goodbye_channel_id:
-            intents.members = True
+        # privileged intent (enabled in the dev portal): welcome/goodbye,
+        # club-member sync, and giveaway re-validation all rely on it
+        intents.members = True
         super().__init__(command_prefix="!tpcd ", intents=intents)
         self.db = Database(config.db_path)
 

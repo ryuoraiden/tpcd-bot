@@ -67,6 +67,10 @@ Team: `/tournament create` (mode Team) posts an embed with no buttons. A captain
 
 Staff-gated: create/start/report/cancel/(register is open, unregister captain-or-staff). Open: join/leave/register/bracket/list. `tournament.py` is pure and covered by offline sims: solo 2-32 players and team 2-16 teams, each checking every match resolves, ping rosters are correct, and the top seed wins when the better seed always wins. DB migration (ADD COLUMN, tested idempotent + against a pre-existing DB) runs in `db.connect()`.
 
+### Club Member sync (2026-07-19)
+
+- `bot/cogs/club_sync.py`: keeps @Club Member (1372179943538299021) equal to "has any TPCD¹..⁷ club role" (7 ids hardcoded in CLUB_ROLE_IDS). Live via on_member_update (only fires when club/member roles changed), plus `tasks.loop(hours=6)` reconcile that also runs at startup. `/clubsync` (staff) forces it and reports counts. Members intent is now enabled unconditionally in `__main__.py` (welcome/goodbye, club sync, and giveaway re-validation all rely on it). Bot's Manage Roles + position verified: TPCD Bot role at 123, Club Member at 87.
+
 ### Giveaways (2026-07-08, replaces Giveaway Boat)
 
 - `bot/giveaway.py` (pure): `parse_duration` ("1d6h" style, 10s..60d, rejects stray text) and `draw_winners` (weighted unique draw with exclusion; statistically verified). `bot/cogs/giveaways.py`: `/giveaway` group (create/end/reroll/cancel/list/entries), persistent `GiveawayView` (Enter toggles entry, Participants shows counts) resolved by message id.

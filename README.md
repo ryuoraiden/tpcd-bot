@@ -4,6 +4,8 @@ Custom bot for the TPCD (Teamer Pest Control Department) Discord server.
 
 **Feature 1: automated daily polls.** Posts one native Discord poll every day at 9:00 AM IST in #daily-polls from a 200-question bank, pings the Poll Ping role, captures results when each poll closes, and posts a weekly recap on Sundays. Zero daily ops required.
 
+**Club member sync.** Anyone holding a TPCD¹..TPCD⁷ club role automatically gets @Club Member, and loses it if they leave all clubs. Reacts instantly to role changes, plus a full reconcile on startup and every 6 hours. `/clubsync` (staff) forces a sync and reports counts.
+
 **Feature 3: giveaways.** Replaces Giveaway Boat: button entry with role requirements (up to 3, all/any logic) and bonus entries for a chosen role, live entrant count, a countdown that updates itself, auto-draw at the deadline with entrants re-validated (left the server or dropped the role = not drawn), reroll that excludes previous winners, and image support. Survives restarts: expired giveaways draw on startup.
 
 **Feature 2: tournaments.** For #tournament-hub, in **solo (1v1), duo (2v2), trio (3v3), or random teams** (sign up solo, get drawn into teams at start) across **single-elimination or round-robin** formats. Proper UI: rendered bracket and standings **images** (Discord-dark theme, seeds, scores, gold winners), button registration (teams register via a name popup + member picker), match announcement cards that ping who's up, score reporting, human result lines, and a gold champion banner. A `/tournament announce` command posts a promo card with a one-click sign-up button (grants the participant role, live count) and a sponsor field.
