@@ -212,7 +212,7 @@ class Giveaways(commands.Cog):
         if req and not ended and not cancelled:
             joiner = " or " if g["role_logic"] == "any" else " and "
             embed.add_field(
-                name="Who can enter",
+                name="Required roles",
                 value=joiner.join(f"<@&{r}>" for r in req),
                 inline=False,
             )
@@ -532,7 +532,7 @@ class Giveaways(commands.Cog):
         rows = await self.db.giveaway_entries(g["id"])
         total = sum(r["entries"] for r in rows)
         header = f"**{g['prize']}** (#{g['id']}): {len(rows)} participants, {total} entries."
-        names = ", ".join(
+        names = "\n ".join(
             f"<@{r['user_id']}>" + (f" x{r['entries']}" if r["entries"] > 1 else "")
             for r in rows[:40]
         )
