@@ -94,7 +94,7 @@ Sticky commands require **Manage Messages**. The default repost speed matches St
 
 | Command | What it does |
 |---|---|
-| `/stick message [style] [image_url] [every_messages] [after_seconds]` | Create or replace this channel's plain-text or embed sticky |
+| `/stick message [style] [image] [image_url] [every_messages] [after_seconds]` | Create or replace this channel's plain-text or embed sticky. `image` uploads (or pastes) a picture; `image_url` links one instead. Both need `style:embed`. Type `\n` in `message` for line breaks |
 | `/stickstop` / `/stickstart` | Pause or resume this channel's sticky |
 | `/stickremove` | Permanently remove this channel's sticky |
 | `/stickies` | List all saved stickies in this server |

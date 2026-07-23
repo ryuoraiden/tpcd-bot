@@ -11,6 +11,7 @@ import asyncio
 import logging
 import time
 from collections import defaultdict
+from pathlib import Path
 from typing import Literal
 from urllib.parse import urlparse
 
@@ -48,17 +49,32 @@ def normalize_content(value: str) -> str:
     return value.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\t", "\t")
 
 
-def _embed_for(row) -> discord.Embed:
-    embed = discord.Embed(description=row["content"], color=0xF2B84B)
-    if row["image_url"]:
-        embed.set_image(url=row["image_url"])
+def _build_embed(content: str, image_url: str | None, attachment_name: str | None) -> discord.Embed:
+    embed = discord.Embed(description=content, color=0xF2B84B)
+    if attachment_name:
+        embed.set_image(url=f"attachment://{attachment_name}")
+    elif image_url:
+        embed.set_image(url=image_url)
     return embed
 
 
-async def _send_sticky(channel, row) -> discord.Message:
+async def _send_sticky(channel, row, image_dir: Path | None) -> discord.Message:
+    """Post the sticky, re-attaching its saved image on every repost.
+
+    Uploaded images can't be referenced by URL (Discord's signed attachment
+    URLs expire), so the bytes are kept on disk and sent fresh each time.
+    """
     kwargs = {"allowed_mentions": discord.AllowedMentions.none()}
+    attachment_name = None
+    image_file = row["image_file"]
+    if image_file and image_dir is not None:
+        path = image_dir / image_file
+        if path.exists():
+            kwargs["file"] = discord.File(path, filename=image_file)
+            attachment_name = image_file
     if row["style"] == "embed":
-        return await channel.send(embed=_embed_for(row), **kwargs)
+        embed = _build_embed(row["content"], row["image_url"], attachment_name)
+        return await channel.send(embed=embed, **kwargs)
     return await channel.send(row["content"], **kwargs)
 
 
@@ -81,9 +97,20 @@ class Stickies(commands.Cog):
         # Channels that have a sticky row; keeps on_message from paying a DB
         # query (and a Lock allocation) for every message server-wide.
         self._sticky_channels: set[int] = set()
+        # Uploaded sticky images live next to the DB and survive restarts.
+        self._image_dir: Path = self.bot.db.path.parent / "stickies"
 
     async def cog_load(self) -> None:
         self._sticky_channels = await self.bot.db.all_sticky_channel_ids()
+        self._image_dir.mkdir(parents=True, exist_ok=True)
+
+    def _remove_image_file(self, image_file: str | None) -> None:
+        if not image_file:
+            return
+        try:
+            (self._image_dir / image_file).unlink(missing_ok=True)
+        except OSError:
+            log.warning("Could not delete sticky image %s", image_file, exc_info=True)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
@@ -104,7 +131,7 @@ class Stickies(commands.Cog):
                 return
 
             try:
-                posted = await _send_sticky(message.channel, row)
+                posted = await _send_sticky(message.channel, row, self._image_dir)
             except (discord.Forbidden, discord.HTTPException):
                 log.warning("Could not repost sticky in channel %s", message.channel.id, exc_info=True)
                 await self.bot.db.set_sticky_message_count(message.channel.id, count)
@@ -117,7 +144,8 @@ class Stickies(commands.Cog):
     @app_commands.describe(
         message="Text to keep visible. Type \\n for a line break; mentions show but never re-ping",
         style="Post as plain text or an embed",
-        image_url="Optional image URL (embed style only)",
+        image="Upload or paste an image to show (embed style only)",
+        image_url="Or link an image by URL instead of uploading (embed style only)",
         every_messages="Repost after this many messages; 0 disables this trigger",
         after_seconds="Repost on the next message after this many seconds; 0 disables",
     )
@@ -127,6 +155,7 @@ class Stickies(commands.Cog):
         interaction: discord.Interaction,
         message: app_commands.Range[str, 1, 1900],
         style: Literal["plain", "embed"] = "plain",
+        image: discord.Attachment | None = None,
         image_url: str | None = None,
         every_messages: app_commands.Range[int, 0, 50] = 5,
         after_seconds: app_commands.Range[int, 0, 3600] = 15,
@@ -140,15 +169,39 @@ class Stickies(commands.Cog):
                 "Enable at least one trigger: messages or seconds.", ephemeral=True
             )
             return
-        if image_url and (style != "embed" or not _valid_image_url(image_url)):
+        if image is not None and image_url:
             await interaction.response.send_message(
-                "An image needs **embed** style and a full `http://` or `https://` URL.",
-                ephemeral=True,
+                "Pick one: upload an image **or** give a link, not both.", ephemeral=True
+            )
+            return
+        if (image is not None or image_url) and style != "embed":
+            await interaction.response.send_message(
+                "Images need **embed** style. Add `style:embed`.", ephemeral=True
+            )
+            return
+        if image is not None and not (image.content_type or "").startswith("image/"):
+            await interaction.response.send_message("That attachment isn't an image.", ephemeral=True)
+            return
+        if image_url and not _valid_image_url(image_url):
+            await interaction.response.send_message(
+                "The image link needs to be a full `http://` or `https://` URL.", ephemeral=True
             )
             return
 
         await interaction.response.defer(ephemeral=True, thinking=True)
         channel = interaction.channel
+
+        # Persist the uploaded image so it can be re-attached on every repost.
+        image_file = None
+        if image is not None:
+            suffix = Path(image.filename or "").suffix
+            if not suffix:
+                subtype = (image.content_type or "image/png").split("/")[-1].split(";")[0]
+                suffix = "." + (subtype or "png")
+            image_file = f"{channel.id}{suffix}"
+            self._image_dir.mkdir(parents=True, exist_ok=True)
+            (self._image_dir / image_file).write_bytes(await image.read())
+
         # Hold the channel lock so an in-flight on_message repost can't
         # interleave and orphan one of the sticky messages.
         async with self._locks[channel.id]:
@@ -157,16 +210,21 @@ class Stickies(commands.Cog):
                 "content": message,
                 "style": style,
                 "image_url": image_url,
+                "image_file": image_file,
             }
             try:
-                posted = await _send_sticky(channel, preview)
+                posted = await _send_sticky(channel, preview, self._image_dir)
             except discord.Forbidden:
+                if image_file and (old is None or old["image_file"] != image_file):
+                    self._remove_image_file(image_file)
                 await interaction.followup.send(
                     "I need **View Channel**, **Send Messages**, and **Embed Links** here.",
                     ephemeral=True,
                 )
                 return
             except discord.HTTPException:
+                if image_file and (old is None or old["image_file"] != image_file):
+                    self._remove_image_file(image_file)
                 await interaction.followup.send("Discord rejected the sticky message.", ephemeral=True)
                 return
 
@@ -176,6 +234,7 @@ class Stickies(commands.Cog):
                 content=message,
                 style=style,
                 image_url=image_url,
+                image_file=image_file,
                 every_messages=every_messages,
                 after_seconds=after_seconds,
                 last_message_id=posted.id,
@@ -185,6 +244,8 @@ class Stickies(commands.Cog):
             self._sticky_channels.add(channel.id)
             if old:
                 await _delete_message(channel, old["last_message_id"])
+                if old["image_file"] and old["image_file"] != image_file:
+                    self._remove_image_file(old["image_file"])
         await interaction.followup.send(
             f"✅ Sticky enabled: every **{every_messages or '—'}** messages or after "
             f"**{after_seconds or '—'}s**.",
@@ -218,6 +279,7 @@ class Stickies(commands.Cog):
                 return
             await self.bot.db.delete_sticky(interaction.channel_id)
             self._sticky_channels.discard(interaction.channel_id)
+            self._remove_image_file(row["image_file"])
             if interaction.channel:
                 await _delete_message(interaction.channel, row["last_message_id"])
         await interaction.response.send_message("✅ Sticky removed completely.", ephemeral=True)

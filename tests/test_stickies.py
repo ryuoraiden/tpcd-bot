@@ -84,6 +84,36 @@ class StickyDatabaseTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.db.delete_sticky(2), 1)
         self.assertIsNone(await self.db.get_sticky(2))
 
+    async def test_image_file_persists(self) -> None:
+        await self.db.upsert_sticky(
+            guild_id=1,
+            channel_id=2,
+            content="see pic",
+            style="embed",
+            image_url=None,
+            image_file="2.png",
+            every_messages=5,
+            after_seconds=15,
+            last_message_id=3,
+            last_posted_at=100.0,
+            created_by=4,
+        )
+        self.assertEqual((await self.db.get_sticky(2))["image_file"], "2.png")
+        # Replacing with no image clears it.
+        await self.db.upsert_sticky(
+            guild_id=1,
+            channel_id=2,
+            content="no pic",
+            style="plain",
+            image_url=None,
+            every_messages=5,
+            after_seconds=15,
+            last_message_id=9,
+            last_posted_at=200.0,
+            created_by=4,
+        )
+        self.assertIsNone((await self.db.get_sticky(2))["image_file"])
+
     async def test_list_is_scoped_to_guild(self) -> None:
         for guild_id, channel_id in ((1, 10), (2, 20)):
             await self.db.upsert_sticky(

@@ -118,6 +118,7 @@ CREATE TABLE IF NOT EXISTS sticky_messages (
     content          TEXT NOT NULL,
     style            TEXT NOT NULL DEFAULT 'plain',
     image_url        TEXT,
+    image_file       TEXT,
     active           INTEGER NOT NULL DEFAULT 1,
     every_messages   INTEGER NOT NULL DEFAULT 5,
     after_seconds    INTEGER NOT NULL DEFAULT 15,
@@ -139,6 +140,7 @@ MIGRATIONS = [
     "ALTER TABLE participants ADD COLUMN team_id INTEGER",
     "ALTER TABLE participants ADD COLUMN is_captain INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE matches ADD COLUMN score TEXT",
+    "ALTER TABLE sticky_messages ADD COLUMN image_file TEXT",
 ]
 
 # matches.p1_user_id / p2_user_id / winner_user_id hold an "entrant" id:
@@ -210,15 +212,17 @@ class Database:
         last_message_id: int,
         last_posted_at: float,
         created_by: int,
+        image_file: str | None = None,
     ) -> None:
         await self.conn.execute(
             "INSERT INTO sticky_messages "
-            "(guild_id, channel_id, content, style, image_url, every_messages, "
+            "(guild_id, channel_id, content, style, image_url, image_file, every_messages, "
             "after_seconds, last_message_id, last_posted_at, created_by) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(channel_id) DO UPDATE SET "
             "guild_id = excluded.guild_id, content = excluded.content, "
-            "style = excluded.style, image_url = excluded.image_url, active = 1, "
+            "style = excluded.style, image_url = excluded.image_url, "
+            "image_file = excluded.image_file, active = 1, "
             "every_messages = excluded.every_messages, after_seconds = excluded.after_seconds, "
             "message_count = 0, last_message_id = excluded.last_message_id, "
             "last_posted_at = excluded.last_posted_at, created_by = excluded.created_by, "
@@ -229,6 +233,7 @@ class Database:
                 content,
                 style,
                 image_url,
+                image_file,
                 every_messages,
                 after_seconds,
                 last_message_id,
