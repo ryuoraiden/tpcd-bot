@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from bot.cogs.stickies import should_repost
+from bot.cogs.stickies import normalize_content, should_repost
 from bot.db import Database
 
 
@@ -17,6 +17,16 @@ class StickyThresholdTests(unittest.TestCase):
     def test_zero_disables_a_threshold(self) -> None:
         self.assertFalse(should_repost(999, 14, 0, 15))
         self.assertTrue(should_repost(1, 15, 0, 15))
+
+
+class NormalizeContentTests(unittest.TestCase):
+    def test_literal_escapes_become_real_characters(self) -> None:
+        self.assertEqual(normalize_content("a\\nb\\nc"), "a\nb\nc")
+        self.assertEqual(normalize_content("a\\r\\nb"), "a\nb")
+        self.assertEqual(normalize_content("a\\tb"), "a\tb")
+
+    def test_plain_text_is_untouched(self) -> None:
+        self.assertEqual(normalize_content("no escapes here"), "no escapes here")
 
 
 class StickyDatabaseTests(unittest.IsolatedAsyncioTestCase):

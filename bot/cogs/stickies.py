@@ -38,11 +38,20 @@ def _valid_image_url(value: str) -> bool:
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 
+def normalize_content(value: str) -> str:
+    """Turn typed escapes into real characters.
+
+    Slash-command text boxes can't hold real line breaks, so people type a
+    literal ``\\n`` to mean "new line". Convert those (and ``\\t``) so the
+    sticky renders the way it was written.
+    """
+    return value.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\t", "\t")
+
+
 def _embed_for(row) -> discord.Embed:
     embed = discord.Embed(description=row["content"], color=0xF2B84B)
     if row["image_url"]:
         embed.set_image(url=row["image_url"])
-    embed.set_footer(text="Pinned reminder")
     return embed
 
 
@@ -106,7 +115,7 @@ class Stickies(commands.Cog):
 
     @app_commands.command(name="stick", description="Keep a message at the bottom of this channel.")
     @app_commands.describe(
-        message="Text to keep visible (mentions are displayed but never re-pinged)",
+        message="Text to keep visible. Type \\n for a line break; mentions show but never re-ping",
         style="Post as plain text or an embed",
         image_url="Optional image URL (embed style only)",
         every_messages="Repost after this many messages; 0 disables this trigger",
@@ -125,6 +134,7 @@ class Stickies(commands.Cog):
         if interaction.guild is None or interaction.channel is None:
             await interaction.response.send_message("Use this command in a server channel.", ephemeral=True)
             return
+        message = normalize_content(message)
         if every_messages == 0 and after_seconds == 0:
             await interaction.response.send_message(
                 "Enable at least one trigger: messages or seconds.", ephemeral=True
