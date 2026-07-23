@@ -28,6 +28,7 @@ COGS = [
     "bot.cogs.self_roles",
     "bot.cogs.giveaways",
     "bot.cogs.club_sync",
+    "bot.cogs.stickies",
 ]
 
 

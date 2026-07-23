@@ -10,20 +10,22 @@ Custom bot for the TPCD (Teamer Pest Control Department) Discord server.
 
 **Feature 2: tournaments.** For #tournament-hub, in **solo (1v1), duo (2v2), trio (3v3), or random teams** (sign up solo, get drawn into teams at start) across **single-elimination or round-robin** formats. Proper UI: rendered bracket and standings **images** (Discord-dark theme, seeds, scores, gold winners), button registration (teams register via a name popup + member picker), match announcement cards that ping who's up, score reporting, human result lines, and a gold champion banner. A `/tournament announce` command posts a promo card with a one-click sign-up button (grants the participant role, live count) and a sponsor field.
 
+**Sticky messages.** Persistent per-channel text or embed notices stay at the bottom of active chats, with adjustable message/time repost thresholds. Settings survive restarts, and mentions are rendered without repeatedly pinging users.
+
 ## Setup
 
 1. **Create the bot application** at https://discord.com/developers/applications
    - New Application -> name it `TPCD Bot`
    - Bot tab -> Reset Token -> copy it (this goes in `.env`)
-   - No privileged intents needed
+   - Enable the **Server Members Intent** used by greetings, club sync, and giveaway re-validation. Sticky messages do not need the Message Content intent.
 
 2. **Invite it** (replace `CLIENT_ID` with your Application ID):
 
    ```
-   https://discord.com/oauth2/authorize?client_id=CLIENT_ID&scope=bot+applications.commands&permissions=157696
+   https://discord.com/oauth2/authorize?client_id=CLIENT_ID&scope=bot+applications.commands&permissions=158720
    ```
 
-   Permissions = View Channels, Send Messages, Embed Links, Mention Everyone (needed for the role ping).
+   Permissions = View Channels, Send Messages, Manage Messages, Embed Links, and Mention Everyone (needed for the role ping).
 
 3. **Configure:**
 
@@ -85,6 +87,18 @@ All gated to Captain / 1st Commander / Manager (or anyone with Manage Server), r
 | `/giveaway cancel [id]` | Cancel, nobody wins |
 | `/giveaway list` | Active giveaways with countdowns |
 | `/giveaway entries [id]` | Who entered, with entry weights |
+
+### Sticky commands
+
+Sticky commands require **Manage Messages**. The default repost speed matches StickyBot: after 5 new messages or, on the next new message, after 15 seconds.
+
+| Command | What it does |
+|---|---|
+| `/stick message [style] [image_url] [every_messages] [after_seconds]` | Create or replace this channel's plain-text or embed sticky |
+| `/stickstop` / `/stickstart` | Pause or resume this channel's sticky |
+| `/stickremove` | Permanently remove this channel's sticky |
+| `/stickies` | List all saved stickies in this server |
+| `/stickspeed [every_messages] [after_seconds]` | View or change this channel's repost thresholds |
 
 Entrants click **Enter** (click again to leave). Requirement checks happen at click time with a clear "you're missing X" message, and again at draw time so dropping a role or leaving the server disqualifies. The bonus role multiplies chances (e.g. boosters get 2x). `id` defaults to the most recent giveaway.
 
